@@ -16,8 +16,18 @@ feedkeywords = db.Table('feedkeywords',
 )
 
 feedauthors = db.Table('feedauthors',
-                        db.Column('feed_id', db.Integer, db.ForeignKey('feed.id')),
-                        db.Column('author_id', db.Integer, db.ForeignKey('author.id'))
+                       db.Column('feed_id', db.Integer, db.ForeignKey('feed.id')),
+                       db.Column('author_id', db.Integer, db.ForeignKey('author.id'))
+)
+
+articlesauthors = db.Table('articlesauthors',
+                           db.Column('article_id', db.Integer, db.ForeignKey('article.id')),
+                           db.Column('author_id', db.Integer, db.ForeignKey('author.id'))
+)
+
+articlescategories = db.Table('articlescategories',
+                              db.Column('article_id', db.Integer, db.ForeignKey('article.id')),
+                              db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
 )
 
 
@@ -29,30 +39,55 @@ class User(db.Model):
     role = db.Column(db.Integer, default=ROLE_USER)
     feeds = db.relationship('Feed', backref='user', lazy='dynamic')
 
+
 class Feed(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     feedname = db.Column(db.String(120), index=True)
     enable_email = db.Column(db.Boolean, default=False)
     email_frequency = db.Column(db.Integer, default=EFREQ_DAILY)
 
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
     authors = db.relationship('Author', secondary=feedauthors,
-                               backref=db.backref('authors', lazy='dynamic'))
+                              backref=db.backref('authors', lazy='dynamic'))
 
     keywords = db.relationship('Keyword', secondary=feedkeywords,
                                backref=db.backref('feeds', lazy='dynamic'))
 
+
 class Author(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    firstname = db.Column(db.String(120), index=True)
+    forenames = db.Column(db.String(120), index=True)
     lastname = db.Column(db.String(120), index=True)
-    middlename = db.Column(db.String(120), default='', index=True)
 
+
+class Article(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    arxiv_id = db.Column(db.String(64), index=True, unique=True)
+    title = db.Column(db.String(120))
+    abstract = db.Column(db.String(2000), index=True)
+    comments = db.Column(db.String(120))
+    created = db.Column(db.Date(), index=True)
+    updated = db.Column(db.Date(), index=True)
+    doi = db.Column(db.String(120), index=True)
+    journalref = db.Column(db.String(120), index=True)
+    mscclass = db.Column(db.String(120))
+    acmclass = db.Column(db.String(120))
+    license = db.Column(db.String(120))
+
+    authors = db.relationship('Author', secondary=articlesauthors,
+                              backref=db.backref('articles', lazy='dynamic'))
+
+    categories = db.relationship('Category', secondary=articlescategories,
+                                 backref=db.backref('articles', lazy='dynamic'))
 
 class Keyword(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     keyword = db.Column(db.String(120), index=True, unique=True)
 
-
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), unique=True)
 
 
 

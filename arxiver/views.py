@@ -10,4 +10,4 @@ from arxiver import app #,db, lm, oid
 @app.route('/index')
 @app.route('/')
 def index():
-    return "Hello world!"
+    return "Hello world 2!"
