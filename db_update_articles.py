@@ -49,10 +49,10 @@ def add_article(metadata):
                 doi=metadata['doi'][0], journalref=metadata['journal-ref'][0],
                 mscclass=metadata['msc-class'][0], acmclass=metadata['acm-class'][0],
                 comments=metadata['comments'][0], license=metadata['license'][0])
-
-    for catname in metadata['categories']:
-        category = add_category(catname)
-        a.categories.append(category)
+    if 'categories' in metadata:
+        for catname in metadata['categories'][0].split(' '):
+            category = add_category(catname)
+            a.categories.append(category)
 
     for fname, lname in zip(metadata['forenames'], metadata['keyname']):
         author = add_author(fname, lname)
@@ -62,21 +62,24 @@ def add_article(metadata):
     return a
 
 
-arxiv = Sickle('http://export.arxiv.org/oai2')
+if __name__=='__main__':
 
-date = datetime.date(2014, 3, 26)
+    arxiv = Sickle('http://export.arxiv.org/oai2')
 
-#records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
-records = arxiv.ListRecords(metadataPrefix= 'arXiv')
+    date = datetime.date(2014, 3, 26)
 
-count=0
-for r in records:
-    count+=1
-    if count % 1000==0: print count
-    try:
-        a = add_article(r.metadata)
-    except:
-        print r.metadata
-        raise
-    #print a.title
-    db.session.commit()
+    #records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
+    records = arxiv.ListRecords(metadataPrefix= 'arXiv')
+
+    count=0
+    badrecords=[]
+    for r in records:
+        count+=1
+        if count % 1000==0: print count
+        try:
+            a = add_article(r.metadata)
+        except Exception as e:
+            badrecords.append(r)
+            print "Exception: ", e
+        #print a.title
+        db.session.commit()
