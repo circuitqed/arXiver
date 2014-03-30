@@ -56,7 +56,8 @@ def add_article(metadata):
 
     for fname, lname in zip(metadata['forenames'], metadata['keyname']):
         author = add_author(fname, lname)
-        a.authors.append(author)
+        if author not in a.authors:
+            a.authors.append(author)
 
     db.session.add(a)
     return a

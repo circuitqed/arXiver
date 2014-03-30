@@ -32,7 +32,7 @@ appControllers.controller("ArticleListCtrl", ['$scope', '$http', 'debounce',
 
             var q = {};
             q.filters = [
-                {name: "title", op: "like", val: "%" + $scope.query + "%"}
+                {name: "title", op: "like", val: "%" + $scope.title_query + "%"}
             ];
 
             var fq = angular.toJson(q);
@@ -45,6 +45,33 @@ appControllers.controller("ArticleListCtrl", ['$scope', '$http', 'debounce',
     }]);
 
 appControllers.controller("ArticleDetailCtrl", ['$scope', '$http', '$routeParams',
+    function ($scope, $http, $routeParams) {
+
+        $http.get("/api/article/" + $routeParams.articleId).success(function (data) {
+            $scope.article = data;
+        });
+
+    }]);
+
+appControllers.controller("FeedDetailCtrl", ['$scope', '$http', '$routeParams',
+    function ($scope, $http, $routeParams) {
+
+        $http.get("/api/article/" + $routeParams.articleId).success(function (data) {
+            $scope.article = data;
+        });
+
+    }]);
+
+appControllers.controller("AuthorDetailCtrl", ['$scope', '$http', '$routeParams',
+    function ($scope, $http, $routeParams) {
+
+        $http.get("/api/article/" + $routeParams.articleId).success(function (data) {
+            $scope.article = data;
+        });
+
+    }]);
+
+appControllers.controller("UserCtrl", ['$scope', '$http', '$routeParams',
     function ($scope, $http, $routeParams) {
 
         $http.get("/api/article/" + $routeParams.articleId).success(function (data) {

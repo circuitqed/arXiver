@@ -19,6 +19,18 @@ app.config(['$routeProvider',
                 templateUrl: 'partials/article-detail.html',
                 controller: 'ArticleDetailCtrl'
             }).
+            when('/author/:authorId', {
+                templateUrl: 'partials/author-detail.html',
+                controller: 'AuthorDetailCtrl'
+            }).
+            when('/user/:userId', {
+                templateUrl: 'partials/user-profile.html',
+                controller: 'UserCtrl'
+            }).
+            when('/feed/:feedId', {
+                templateUrl: 'partials/feed-detail.html',
+                controller: 'FeedDetailCtrl'
+            }).
             otherwise({
                 redirectTo: '/articles'
             });
