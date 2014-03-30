@@ -66,10 +66,10 @@ if __name__=='__main__':
 
     arxiv = Sickle('http://export.arxiv.org/oai2')
 
-    date = datetime.date(2014, 3, 26)
+    date = datetime.date(2014, 2, 14)
 
-    #records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
-    records = arxiv.ListRecords(metadataPrefix= 'arXiv')
+    records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
+    #records = arxiv.ListRecords(metadataPrefix= 'arXiv')
 
     count=0
     badrecords=[]
@@ -82,4 +82,9 @@ if __name__=='__main__':
             badrecords.append(r)
             print "Exception: ", e
         #print a.title
+        if count == 5180:
+            print r.metadata
+            db.engine.echo=True
+            db.session.commit()
+            db.engine.echo=False
         db.session.commit()

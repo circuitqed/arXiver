@@ -1,16 +1,20 @@
+from flask.ext.restless import APIManager
+
 __author__ = 'dave'
 
 import os
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
+from sqlalchemy.ext.orderinglist import ordering_list
 from flask.ext.login import LoginManager
 from flask.ext.openid import OpenID
 from config import basedir
-from config import ADMINS,MAIL_SERVER,MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
+from config import ADMINS, MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='')
 app.config.from_object('config')
 db = SQLAlchemy(app)
+
 #lm = LoginManager()
 #lm.init_app(app)
 #lm.login_view = 'login'
@@ -28,13 +32,18 @@ if not app.debug:
     # app.logger.addHandler(mail_handler)
 
     from logging.handlers import RotatingFileHandler
-    file_handler = RotatingFileHandler('tmp/'+__name__+'.log','a', 1*1024*1024,10)
+
+    file_handler = RotatingFileHandler('tmp/' + __name__ + '.log', 'a', 1 * 1024 * 1024, 10)
     file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
     app.logger.setLevel(logging.INFO)
     file_handler.setLevel(logging.INFO)
 
     app.logger.addHandler(file_handler)
-    app.logger.info(__name__+' startup')
-
+    app.logger.info(__name__ + ' startup')
 
 from arxiver import views, models
+
+api_manager = APIManager(app, flask_sqlalchemy_db=db)
+api_manager.create_api(models.Article, methods=['GET'])
+api_manager.create_api(models.Author, methods=['GET'])
+api_manager.create_api(models.Category, methods=['GET'], include_columns=['name', 'id'],results_per_page=2000)

@@ -1,0 +1,10 @@
+<h2>{{ author.forenames }} {{ author.lastname }}</h2>
+
+<table>
+    <tr ng-repeat="article in articles" ng-mouseover="doHover(article)" ng-mouseleave="doLeave()">
+        <td>
+            <a href="#/article/{{article.id}}">{{ article.arxiv_id }} - {{ article.title }}</a> <br/>
+                <span ng-repeat="author in article.authors">{{ author.lastname }}<span ng-show=" ! $last ">, </span></span>
+        </td>
+    </tr>
+</table>

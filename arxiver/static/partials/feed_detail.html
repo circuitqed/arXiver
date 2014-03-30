@@ -1,0 +1,23 @@
+<div>
+    <input type="text" ng-model="feed.name"/>
+    <input type="checkbox" ng-model="feed.enable_email"/>
+    <select ng-model="feed.email_frequency" ng-options="freq for freq in frequencies"></select>
+    <table>
+        <tr>
+            <td>Authors to follow</td>
+        </tr>
+        <tr ng-repeat="author for author in feed.authors">
+            <td><input type="text" ng-model="author"/></td>
+        </tr>
+        <tr>
+            <td><input type="text" ng-model="new_author"/></td>
+            <td><button ng-click="addAuthor(new_author)">+</button></td>
+        </tr>
+    </table>
+    <table>
+        <tr ng-repeat="keywords for keywords in feed.keywords">
+            <td><input type="text" ng-model="author"/></td>
+        </tr>
+
+    </table>
+</div>

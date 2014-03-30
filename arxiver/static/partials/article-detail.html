@@ -1,0 +1,11 @@
+Article Detail!
+
+<div>
+    <div>{{ article.arxiv_id }}</div>
+    <div>{{ article.title }}</div>
+    <div ng-repeat="author in article.authors">{{ author.forenames }} {{ author.lastname }}</div>
+    <div>{{ article.abstract }}</div>
+    <div>{{ article.comments }}</div>
+    <div>{{ article.doi }}</div>
+    <div>{{ article.journal-ref }}</div>
+</div>

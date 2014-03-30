@@ -1,0 +1,27 @@
+test!
+
+<div>Title: <input type="text" ng-model="title_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
+<div>Author: <input type="text" ng-model="author_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
+<div>Keyword: <input type="text" ng-model="keyword_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
+<div>Year(s): <input type="text" ng-model="date_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
+
+Category: <input type="text" ng-model="cat" typeahead="c.name for c in categories | filter:$viewValue  | limitTo:8"  />
+<div>Category: <select ng-model="cat2" ng-options="c.name for c in categories"></select></div>
+
+<table>
+    <tr ng-repeat="article in articles" ng-mouseover="doHover(article)" ng-mouseleave="doLeave()">
+        <td>
+            <a href="#/article/{{article.id}}">{{ article.arxiv_id }} - {{ article.title }}</a> <br/>
+                <span ng-repeat="author in article.authors">{{ author.lastname }}<span ng-show=" ! $last ">, </span></span></td>
+    </tr>
+</table>
+
+<div ng-show="hovering">
+    <div>{{ hover_article.arxiv_id }}</div>
+    <div>{{ hover_article.title }}</div>
+    <div ng-repeat="author in hover_article.authors">{{ author.forenames }} {{ author.lastname }}</div>
+    <div>{{ hover_article.abstract }}</div>
+    <div>{{ hover_article.comments }}</div>
+    <div>{{ hover_article.doi }}</div>
+    <div>{{ hover_article.journalref }}</div>
+</div>
