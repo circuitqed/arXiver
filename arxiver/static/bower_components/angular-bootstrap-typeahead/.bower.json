@@ -1,0 +1,26 @@
+{
+  "name": "angular-bootstrap-typeahead",
+  "version": "0.6.0",
+  "homepage": "https://github.com/martco/angular-bootstrap-typeahead",
+  "main": "ui-bootstrap-custom-tpls-0.6.0.js",
+  "dependencies": {
+    "angular": "1.2.0-rc.3"
+  },
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "_release": "0.6.0",
+  "_resolution": {
+    "type": "version",
+    "tag": "0.6.0",
+    "commit": "0a748409979065a2461c4d0f3085e37e4e7b8e10"
+  },
+  "_source": "git://github.com/martco/ng-bootstrap-typeahead.git",
+  "_target": "~0.6.0",
+  "_originalSource": "angular-bootstrap-typeahead",
+  "_direct": true
+}
