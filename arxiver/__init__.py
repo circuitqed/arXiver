@@ -1,8 +1,5 @@
-from flask.ext.restless import APIManager
-
 __author__ = 'dave'
 
-import os
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.orderinglist import ordering_list
@@ -10,10 +7,12 @@ from flask.ext.login import LoginManager
 from flask.ext.openid import OpenID
 from config import basedir
 from config import ADMINS, MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
+from flask.ext.restful import Api
 
 app = Flask(__name__, static_url_path='')
 app.config.from_object('config')
 db = SQLAlchemy(app)
+api = Api(app)
 
 #lm = LoginManager()
 #lm.init_app(app)
@@ -41,9 +40,5 @@ if not app.debug:
     app.logger.addHandler(file_handler)
     app.logger.info(__name__ + ' startup')
 
-from arxiver import views, models
+from arxiver import views, models, apis
 
-api_manager = APIManager(app, flask_sqlalchemy_db=db)
-api_manager.create_api(models.Article, methods=['GET'])
-api_manager.create_api(models.Author, methods=['GET'])
-api_manager.create_api(models.Category, methods=['GET'], include_columns=['name', 'id'],results_per_page=2000)

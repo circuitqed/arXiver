@@ -1,7 +1,21 @@
+<h1>Author Detail Page</h1>
 <h2>{{ author.forenames }} {{ author.lastname }}</h2>
 
+<hr />
+<h3>Similar names</h3>
+<div >
+    <span ng-repeat="sa in similar_authors">
+    <a ng-href="#/author/{{ sa.id }}">{{ sa.forenames }} {{ sa.lastname }}</a><span ng-show="!$last">, </span>
+        </span>
+</div>
+<hr/>
+<div>
+    <h3>Collaborators</h3>
+    <p>Todo</p>
+</div>
+<h3>Papers</h3>
 <table>
-    <tr ng-repeat="article in articles" ng-mouseover="doHover(article)" ng-mouseleave="doLeave()">
+    <tr ng-repeat="article in author.articles" ng-mouseover="doHover(article)" ng-mouseleave="doLeave()">
         <td>
             <a href="#/article/{{article.id}}">{{ article.arxiv_id }} - {{ article.title }}</a> <br/>
                 <span ng-repeat="author in article.authors">{{ author.lastname }}<span ng-show=" ! $last ">, </span></span>

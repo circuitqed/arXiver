@@ -1,21 +1,20 @@
-test!
-
 <div>Title: <input type="text" ng-model="title_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
 <div>Author: <input type="text" ng-model="author_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
-<div>Keyword: <input type="text" ng-model="keyword_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
-<div>Year(s): <input type="text" ng-model="date_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
+<div>Abstract: <input type="text" ng-model="keyword_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
+<div>Year: <input type="text" ng-model="date_query" ng-keyup="doSearch()" placeholder="Search..."/></div>
 
-Category: <input type="text" ng-model="cat" typeahead="c.name for c in categories | filter:$viewValue  | limitTo:8"  />
-<div>Category: <select ng-model="cat2" ng-options="c.name for c in categories"></select></div>
-
-<table>
-    <tr ng-repeat="article in articles" ng-mouseover="doHover(article)" ng-mouseleave="doLeave()">
-        <td>
-            <a href="#/article/{{article.id}}">{{ article.arxiv_id }} - {{ article.title }}</a> <br/>
-                <span ng-repeat="author in article.authors">{{ author.lastname }}<span ng-show=" ! $last ">, </span></span></td>
-    </tr>
-</table>
-
+Category: <!--<input type="text" ng-model="category_query" typeahead="c.name for c in categories | filter:$viewValue  | limitTo:8"/>-->
+<hr/>
+<a ng-show="articles.length" ng-href="#/feed/new">Save as feed</a>
+<ul>
+    <li ng-repeat="article in articles" ng-mouseover="doHover(article)" ng-mouseleave="doLeave()">
+        <a href="#/article/{{ article.id }}">{{ article.arxiv_id }} - {{ article.title }}</a>
+        <button ng-click="addLike(article)">Like</button>
+        <br/>
+        <span ng-repeat="author in article.authors">{{ author.forenames[0] }}. {{ author.lastname }}<span ng-show=" ! $last ">, </span></span>
+    </li>
+</ul>
+<hr/>
 <div ng-show="hovering">
     <div>{{ hover_article.arxiv_id }}</div>
     <div>{{ hover_article.title }}</div>

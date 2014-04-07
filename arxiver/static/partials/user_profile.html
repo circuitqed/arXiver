@@ -1,11 +1,16 @@
 <h2>{{ user.nickname }}</h2>
+<div>{{ user.fullname }}</div>
+<div>{{ user.email }}</div>
 
-
+<h3>Followed feeds:</h3>
 <table>
-    <tr ng-repeat="feed in feeds">
+    <tr>
+        <td><a href="#/feed/new">New Feed</a></td>
+    </tr>
+    <tr ng-repeat="feed in user.feeds">
         <td>
             {{ feed.feedname }}
         </td>
-        <td><input ng-model="email_subscribe_{{ feed.id }}" type="checkbox" checked="{{ feed.enable_email }}"></td>
+        <td ng-show="true"> <input ng-model="feed.enable_email" type="checkbox" checked="{{ feed.enable_email }}"></td>
     </tr>
 </table>

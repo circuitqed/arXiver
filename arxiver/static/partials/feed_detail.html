@@ -1,23 +1,70 @@
 <div>
-    <input type="text" ng-model="feed.name"/>
-    <input type="checkbox" ng-model="feed.enable_email"/>
-    <select ng-model="feed.email_frequency" ng-options="freq for freq in frequencies"></select>
-    <table>
-        <tr>
-            <td>Authors to follow</td>
-        </tr>
-        <tr ng-repeat="author for author in feed.authors">
-            <td><input type="text" ng-model="author"/></td>
-        </tr>
-        <tr>
-            <td><input type="text" ng-model="new_author"/></td>
-            <td><button ng-click="addAuthor(new_author)">+</button></td>
-        </tr>
-    </table>
-    <table>
-        <tr ng-repeat="keywords for keywords in feed.keywords">
-            <td><input type="text" ng-model="author"/></td>
-        </tr>
+    <h3 ng-hide='newFeed'>Edit Feed: {{ Feed.name }}</h3>
 
+    <h3 ng-show='newFeed'>New Feed</h3>
+</div>
+<form>
+    <fieldset>
+        <div>
+            <label>Name</label>
+            <input type='text' ng-model="feed.name"/>
+            <label>Public</label>
+            <input type='checkbox' ng-model="feed.public"/>
+            <label>Email subscribe</label>
+            <input type="checkbox" ng-model="feed.enable_email"/>
+            <select ng-show="feed.enable_email" ng-model="feed.email_frequency" ng-options="opt.name for opt in emailOptions"></select>
+        </div>
+
+        <div>
+            <p>Authors to follow:</p>
+            <input type="text" ng-model="new_author" ng-keyup="doAuthorSearch()"/>
+            <button ng-click='addAuthor()'>+</button>
+            <span ng-repeat="a in author_preview"><span ng-show="$first">Suggestions: </span>{{ a.forenames }} {{ a.lastname }}<span ng-hide="$last">, </span></span></span>
+
+
+            <ul>
+                <li ng-repeat="author in feed.authors">
+                    <input type="text" ng-model="author" ng-keyup="doAuthorSearch()"/>
+                    <button ng-click='removeAuthor(author)'>-</button>
+                </li>
+
+            </ul>
+        </div>
+
+        <div>
+            <p>Keywords:</p>
+            <input type="text" ng-model="new_keyword" ng-keyup="doKeywordSearch()"/>
+            <button ng-click='addKeyword(author)'>+</button>
+            <span ng-repeat="kw in keyword_preview"><span ng-show="$first">Suggestions: </span>{{ kw.keyword }}<span ng-hide="$last">, </span></span></span>
+
+            <ul>
+                <li ng-repeat="keyword in feed.keywords">
+                    <input type="text" ng-model="keyword"/>
+                    <button ng-click='removeKeyword(keyword)'>-</button>
+                </li>
+            </ul>
+        </div>
+
+        <div class='modal-footer'>
+            <button type='submit' class="btn btn-primary" data-dismiss="modal" ng-click="save()"><span
+                    ng-show="newFeed">Create</span><span ng-hide="newFeed">Update</span></button>
+            <button type='submit' class="btn btn-danger" data-dismiss="modal" ng-click="delete()"><span
+                    ng-show="newFeed">Cancel</span><span ng-hide="newFeed">Delete</span></button>
+        </div>
+    </fieldset>
+</form>
+
+<div>
+    <h3>Preview</h3>
+    <table>
+        <tr ng-repeat="article in articles" ng-mouseover="doHover(article)" ng-mouseleave="doLeave()">
+            <td>
+                <a href="#/article/{{ article.id }}">{{ article.arxiv_id }} - {{ article.title }}</a> <br/>
+                <span ng-repeat="author in article.authors">{{ author.lastname }}<span
+                        ng-show=" ! $last ">, </span>
+                </span>
+            </td>
+        </tr>
     </table>
+
 </div>

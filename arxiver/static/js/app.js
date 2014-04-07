@@ -2,13 +2,13 @@
  * Created by dave on 3/28/14.
  */
 
-var app = angular.module("app", [
+var arxiver = angular.module("arxiver", [
     'ngRoute',
-    'ui.bootstrap',
-    'appControllers'
+    //'ui.bootstrap',
+    'arxiverControllers'
 ]);
 
-app.config(['$routeProvider',
+arxiver.config(['$routeProvider',
     function($routeProvider) {
         $routeProvider.
             when('/articles', {
@@ -20,15 +20,15 @@ app.config(['$routeProvider',
                 controller: 'ArticleDetailCtrl'
             }).
             when('/author/:authorId', {
-                templateUrl: 'partials/author-detail.html',
+                templateUrl: 'partials/author_detail.html',
                 controller: 'AuthorDetailCtrl'
             }).
             when('/user/:userId', {
-                templateUrl: 'partials/user-profile.html',
+                templateUrl: 'partials/user_profile.html',
                 controller: 'UserCtrl'
             }).
             when('/feed/:feedId', {
-                templateUrl: 'partials/feed-detail.html',
+                templateUrl: 'partials/feed_detail.html',
                 controller: 'FeedDetailCtrl'
             }).
             otherwise({
@@ -42,7 +42,7 @@ app.config(['$routeProvider',
 // N milliseconds. If `immediate` is passed, trigger the function on the
 // leading edge, instead of the trailing.
 // http://plnkr.co/edit/kODSLa?p=info
-app.factory('debounce', function($timeout, $q) {
+arxiver.factory('debounce', function($timeout, $q) {
   return function(func, wait, immediate) {
     var timeout;
     var deferred = $q.defer();

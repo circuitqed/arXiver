@@ -1,11 +1,16 @@
-Article Detail!
-
 <div>
     <div>{{ article.arxiv_id }}</div>
     <div>{{ article.title }}</div>
-    <div ng-repeat="author in article.authors">{{ author.forenames }} {{ author.lastname }}</div>
+    <span ng-repeat="author in article.authors">
+        <a ng-href="#/author/{{ author.id }}">{{ author.forenames }} {{ author.lastname }}</a><span ng-hide="$last">, </span>
+    </span>
+    <div>
+        <span ng-show="article.created">Created: {{ article.created }}</span>
+        <span ng-show="article.updated">Updated: {{ article.updated }}</span>
+
+    </div>
     <div>{{ article.abstract }}</div>
     <div>{{ article.comments }}</div>
-    <div>{{ article.doi }}</div>
-    <div>{{ article.journal-ref }}</div>
+    <div><a ng-href="http://dx.doi.org/{{ article.doi }}">{{ article.doi }}</a></div>
+    <div>{{ article.journalref }}</div>
 </div>

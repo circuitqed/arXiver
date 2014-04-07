@@ -83,9 +83,4 @@ if __name__=='__main__':
             badrecords.append(r)
             print "Exception: ", e
         #print a.title
-        if count == 5180:
-            print r.metadata
-            db.engine.echo=True
-            db.session.commit()
-            db.engine.echo=False
         db.session.commit()
