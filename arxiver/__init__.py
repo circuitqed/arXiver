@@ -1,5 +1,6 @@
 __author__ = 'dave'
 
+import os
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.orderinglist import ordering_list
@@ -14,10 +15,10 @@ app.config.from_object('config')
 db = SQLAlchemy(app)
 api = Api(app)
 
-#lm = LoginManager()
-#lm.init_app(app)
-#lm.login_view = 'login'
-#oid = OpenID(app,os.path.join(basedir,'tmp'))
+lm = LoginManager()
+lm.init_app(app)
+lm.login_view = 'login'
+oid = OpenID(app,os.path.join(basedir,'tmp'))
 
 if not app.debug:
     import logging
@@ -40,5 +41,5 @@ if not app.debug:
     app.logger.addHandler(file_handler)
     app.logger.info(__name__ + ' startup')
 
-from arxiver import views, models, apis
+from arxiver import views, models  #, apis
 

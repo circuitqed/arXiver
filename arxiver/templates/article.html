@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+    <div>
+        {{ render_article(article) }}
+        <span>Created: {{ article.created }}</span>
+        <span>Updated: {{ article.updated }}</span>
+    </div>
+    <div>{{ article.abstract }}</div>
+    <div>{{ article.comments }}</div>
+    <div><a href="http://dx.doi.org/{{ article.doi }}">{{ article.doi }}</a></div>
+    <div>{{ article.journalref }}</div>
+{% endblock %}

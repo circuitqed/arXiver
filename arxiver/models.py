@@ -4,6 +4,8 @@ from hashlib import md5
 from arxiver import db
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy import or_, and_
+
 import datetime
 
 ROLE_USER = 0
@@ -57,12 +59,44 @@ class User(db.Model):
     nickname = db.Column(db.String(64), unique=True, index=True)
     email = db.Column(db.String(120), unique=True, index=True)
     role = db.Column(db.Integer, default=ROLE_USER)
+    last_seen =db.Column(db.DateTime())
 
     feeds = db.relationship('Subscription', secondary=usersubscriptions,
                             backref=db.backref('followers', lazy='dynamic'))
 
     likes = db.relationship('Article', secondary=articlelikes,
                             backref=db.backref('likers', lazy='dynamic'))
+
+    def avatar(self,size):
+        return 'http://www.gravatar.com/avatar/' + md5 (self.email).hexdigest() + '?d=mm&s=' + str(size)
+
+    @staticmethod
+    def make_unique_nickname(nickname):
+        if User.query.filter_by(nickname = nickname).first() == None:
+            return nickname
+        version = 2
+        while True:
+            new_nickname = nickname + str(version)
+            if User.query.filter_by(nickname = new_nickname).first() == None:
+                break
+            version += 1
+        return new_nickname
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return unicode(self.id)
+
+    def __repr__(self):
+        return '<User %r>' % (self.nickname)
+
 
 class Feed(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -83,9 +117,9 @@ class Feed(db.Model):
 
     def feed_articles(self):
         conditions=[]
-        for a in f.authors:
+        for a in self.authors:
             conditions.append(Article.authors.has(Author.id==a.id))
-        for kw in f.keywords:
+        for kw in self.keywords:
             conditions.append(Article.title.ilike('%'+kw+'%'))
             conditions.append(Article.abstract.ilike('%'+kw+'%'))
 

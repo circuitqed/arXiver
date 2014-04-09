@@ -1,0 +1,9 @@
+{% macro render_article(article) %}
+<div>
+    <a href="{{ url_for('article', id=article.id) }}">{{ article.arxiv_id }} - {{ article.title }}</a> <br/>
+    {% for a in article.authors %}
+        <a href="{{ url_for('author', id=a.id) }}">{{ a.forenames }} {{ a.lastname }}</a>{% if not loop.last %},
+    {% endif %}
+    {% endfor %}
+</div>
+{% endmacro %}

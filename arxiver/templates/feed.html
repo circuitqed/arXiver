@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+    <form action="" method="post" name="feed">
+        <div>
+            <label>Name</label>
+            {{ form.name }}
+            <label>Public</label>
+            {{ form.public }}
+            <label>Email subscribe</label>
+            {{ form.enable_email }}
+            {{ form.email_frequency }}
+        </div>
+
+    <div>
+         <table class="DynamicTextFieldList" data-name="author">
+                <tr>
+                    <th>{{ form.authors.label }}</th>
+                </tr>
+                {% for author in form.authors %}
+                <tr class="removable-field-row">
+                    <td>{{ author }}</td>
+                    <td><button type="button" class="removable-field-button">&times;</button></td>
+                </tr>
+                {% endfor %}
+                <tr><td><a href="#" class="addable-field-button btn btn-info">+</a></td><td></td></tr>
+            </table>
+        </div>
+
+        <div>
+
+
+            <table class="DynamicTextFieldList" data-name="keyword">
+                <tr>
+                    <th> {{ form.keywords.label }} </th>
+                </tr>
+                {% for keyword in form.keywords %}
+                <tr class="removable-field-row">
+                    <td>{{ keyword }}</td>
+                    <td><button type="button" class="removable-field-button">&times;</button></td>
+                </tr>
+                {% endfor %}
+                <tr><td><a href="#" class="addable-field-button btn btn-info">+</a></td><td></td></tr>
+            </table>
+        </div>
+
+            <input type="submit" name="Save"/>
+        </div>
+
+    </form>
+{% endblock %}

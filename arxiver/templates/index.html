@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1> Search</h1>
+
+    <form action="" method="post" name="search">
+        {{ form.hidden_tag() }}
+        <table>
+            <tr>
+                <td>Title:</td>
+                <td>{{ form.title(size=64) }}</td>
+            </tr>
+            <tr>
+                <td>Author:</td>
+                <td>{{ form.author(size=64) }}</td>
+            </tr>
+            <tr>
+                <td>Keyword</td>
+                <td>{{ form.keyword(size=64) }}</td>
+            </tr>
+            <tr>
+                <td>Categories:</td>
+                <td>{{ form.category }}</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><input type="submit" value="Search"></td>
+            </tr>
+        </table>
+
+    </form>
+
+    <hr/>
+
+    <div>
+    {% if articles != None %}
+        <h2>Search Results: </h2>
+        <ol>
+        {% for article in articles %}
+            <li>{{ render_article(article) }}</li>
+        {% endfor %}
+        </ol>
+    {% endif %}
+
+
+    </div>
+
+{% endblock %}

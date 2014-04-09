@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>{{ user.nickname }}</h1>
+    <div>{{ user.fullname }}</div>
+    <div>{{ user.email }}</div>
+
+    <h3>Followed feeds:</h3>
+
+    <a href="#/feed/new">New Feed</a>
+    <ul>
+        {% for feeds in user.feeds %}
+            {{ feed.feedname }}
+            <input type="checkbox" checked="{{ feed.enable_email }}">
+        {% endfor %}
+    </ul>
+{% endblock %}
