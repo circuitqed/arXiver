@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import render_template, redirect, flash, session, url_for, request, g
 from flask.ext.login import login_user, logout_user, current_user, login_required
 from arxiver import app, db, lm, oid
-from forms import LoginForm, SearchForm,FeedForm
+from forms import LoginForm, SearchForm, FeedForm
 #from models import User, ROLE_USER, ROLE_ADMIN
 from models import *
 
@@ -23,7 +23,7 @@ def internal_error(error):
 @lm.user_loader
 def load_user(id):
     u = User.query.get(int(id))
-    print "load_user: ", u
+    #print "load_user: ", u
     return u
 
 
@@ -143,15 +143,43 @@ def author(id):
 
     return render_template('author.html', author=author, similar_authors=similar_authors)
 
-@app.route('/feed/<id>')
-@app.route('/feed/new')
+
+@app.route('/feed/<id>', methods=['GET', 'POST'])
+@app.route('/feed/new', methods=['GET', 'POST'])
 @login_required
 def feed(id=None):
-    form=FeedForm()
     if id is None:
-        feed=None
+        f = None
     else:
-        feed=Feed.query.filter(Feed.id==id).first()
-    for keyword in form.keywords:
-        print keyword
-    return render_template('feed.html',feed=feed, form=form)
+        f = Feed.query.filter(Feed.id == id).first()
+    newfeed = f is None
+
+    form = FeedForm(request.form, f)
+    print form
+
+    if form.validate_on_submit():
+        print 'validated'
+        if newfeed:
+            f = Feed()
+            g.user.feeds.append(f)
+            s = Subscription(subscriber=g.user, feed=f, enable_email=form.enable_email.data,
+                             email_frequency=form.email_frequency.data)
+        form.populate_obj(f)
+
+        # if newfeed:
+        #     g.user.feeds.append(f)
+        #     db.session.add(g.user)
+        # else:
+        #     db.session.add(f)
+
+        db.session.add(f)
+        db.session.commit()
+        flash('Feed updated.')
+        return redirect(url_for('feed', id=f.id))
+
+    if f is not None:
+        articles=f.feed_articles().all()
+        print len(articles)
+    else:
+        articles=None
+    return render_template('feed.html', feed=f, form=form,articles=articles)

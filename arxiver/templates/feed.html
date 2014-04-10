@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
     <form action="" method="post" name="feed">
+        {{ form.hidden_tag() }}
         <div>
             <label>Name</label>
             {{ form.name }}
@@ -9,42 +10,62 @@
             <label>Email subscribe</label>
             {{ form.enable_email }}
             {{ form.email_frequency }}
+
         </div>
 
-    <div>
-         <table class="DynamicTextFieldList" data-name="author">
+        <div>
+            <table class="DynamicTextFieldList" data-name="authors">
                 <tr>
                     <th>{{ form.authors.label }}</th>
                 </tr>
-                {% for author in form.authors %}
-                <tr class="removable-field-row">
-                    <td>{{ author }}</td>
-                    <td><button type="button" class="removable-field-button">&times;</button></td>
-                </tr>
+                {% for author in form.authors.data %}
+                    <tr class="removable-field-row">
+                        <td><input id="authors-{{ loop.index - 1 }}" name="authors-{{ loop.index - 1}}" type="text"
+                                   value="{{ author.id }}"></td>
+                        <td>
+                            <button type="button" class="removable-field-button">&times;</button>
+                        </td>
+                    </tr>
                 {% endfor %}
-                <tr><td><a href="#" class="addable-field-button btn btn-info">+</a></td><td></td></tr>
+                <tr>
+                    <td><a href="#" class="addable-field-button btn btn-info">+</a></td>
+                    <td></td>
+                </tr>
             </table>
         </div>
 
         <div>
 
 
-            <table class="DynamicTextFieldList" data-name="keyword">
+            <table class="DynamicTextFieldList" data-name="keywords">
                 <tr>
                     <th> {{ form.keywords.label }} </th>
                 </tr>
                 {% for keyword in form.keywords %}
-                <tr class="removable-field-row">
-                    <td>{{ keyword }}</td>
-                    <td><button type="button" class="removable-field-button">&times;</button></td>
-                </tr>
+                    <tr class="removable-field-row">
+                        <td>{{ keyword }}</td>
+                        <td>
+                            <button type="button" class="removable-field-button">&times;</button>
+                        </td>
+                    </tr>
                 {% endfor %}
-                <tr><td><a href="#" class="addable-field-button btn btn-info">+</a></td><td></td></tr>
+                <tr>
+                    <td><a href="#" class="addable-field-button btn btn-info">+</a></td>
+                    <td></td>
+                </tr>
             </table>
         </div>
 
-            <input type="submit" name="Save"/>
-        </div>
+        <input type="submit" name="Save"/>
+
 
     </form>
+    <hr/>
+    <div>
+        <ol>
+        {% for article in feed.feed_articles() %}
+        <li>{{ render_article(article) }}</li>
+        {% endfor %}
+        </ol>
+    </div>
 {% endblock %}

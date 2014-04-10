@@ -6,11 +6,14 @@
 
     <h3>Followed feeds:</h3>
 
-    <a href="#/feed/new">New Feed</a>
-    <ul>
-        {% for feeds in user.feeds %}
-            {{ feed.feedname }}
-            <input type="checkbox" checked="{{ feed.enable_email }}">
+    <a href="{{ url_for('feed',id=None) }}">New Feed</a>
+    <table>
+    <tr><th>Feed</th><th>Email</th></tr>
+        {% for s in user.subscriptions %}
+            <tr>
+                <td><a href="{{ url_for("feed",id=s.feed.id) }}">{{ s.feed.name }}</a></td>
+            <td><input type="checkbox" checked="{{ s.enable_email }}"></td>
+            </tr>
         {% endfor %}
-    </ul>
+    </table>
 {% endblock %}

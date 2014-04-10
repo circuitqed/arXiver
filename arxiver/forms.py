@@ -1,11 +1,11 @@
 __author__ = 'dave'
 
 from flask.ext.wtf import Form
-from wtforms import TextField, TextAreaField, BooleanField, SelectMultipleField, FieldList
+from wtforms import TextField, TextAreaField, BooleanField, SelectMultipleField, FieldList, SelectField
 from wtforms.validators import Required, Length
 from wtforms.ext.sqlalchemy.orm import model_form
 
-from arxiver.models import User, Category, Feed
+from arxiver.models import *
 from arxiver import db
 
 
@@ -44,9 +44,54 @@ class SearchForm(Form):
     year = TextField('year')
 
 
+
 #learned from https://gist.github.com/kageurufu/6813878
 class FeedForm(Form):
     name = TextField('Name')
     public = BooleanField('Public')
-    authors = FieldList(TextField('Author'), min_entries=3)
-    keywords = FieldList(TextField('Keyword'), min_entries=3)
+    enable_email = BooleanField('Email subscribe')
+    email_frequency = SelectField('Frequency', choices=( ('0', 'Daily'), ('1', 'Weekly'), ('2', 'Monthly')))
+    authors = FieldList(TextField('Author'), min_entries=1)
+    keywords = FieldList(TextField('Keyword'), min_entries=1)
+
+    def populate_obj(self, obj):
+        authors = []
+        for author_id in self.authors.data:
+            try:
+                aid=int(author_id)
+                a = Author.query.filter(Author.id == aid).first()
+            except:
+                a=None
+            if a is not None:
+                authors.append(a)
+        #print "authors: " , authors
+
+        kws = []
+        for k in self.keywords.data:
+            kw = Keyword.query.filter(Keyword.keyword.ilike(k)).first()
+            if kw is None:
+                kw = Keyword(keyword=k)
+                print kw.keyword
+                db.session.add(kw)
+                #db.session.commit()
+            kws.append(kw)
+
+        obj.public=self.public.data
+        obj.name=self.name.data
+        obj.timestamp=datetime.datetime.utcnow()
+        obj.authors=authors
+        obj.keywords=kws
+
+
+    def init_form(self,obj):
+        self.name.data=obj.name
+        self.public.data=obj.public
+        self.enable_email.data=obj.enable_email
+        self.email_frequency.data=obj.email_frequency
+        for author in obj.authors:
+            self.authors.append(str(author.id))
+        for keyword in obj.keywords:
+            self.keywords.append_entry(keyword.keyword)
+
+
+

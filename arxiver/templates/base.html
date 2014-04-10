@@ -6,6 +6,7 @@
     {% else %}
         <title>Arxiver</title>
     {% endif %}
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='arxiver.css') }}" media="screen" />
 </head>
 <body>
 <div>Arxiver:
@@ -29,6 +30,7 @@
 {% block content %}{% endblock %}
 <script src="{{ url_for("static", filename="js/jquery-1.11.0.js") }}"></script>
 <script src="{{ url_for("static", filename="js/arxiver.js") }}"></script>
+
 
 </body>
 </html>

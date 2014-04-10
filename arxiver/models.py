@@ -35,23 +35,20 @@ articlescategories = db.Table('articlescategories',
                               db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
 )
 
-usersubscriptions = db.Table('usersubscriptions',
-                             db.Column('user_id', db.Integer, db.ForeignKey('user.id')),
-                             db.Column('subscription_id', db.Integer, db.ForeignKey('subscription.id'))
-)
-
 articlelikes = db.Table('articlelikes',
                         db.Column('article_id', db.Integer, db.ForeignKey('article.id')),
                         db.Column('user_id', db.Integer, db.ForeignKey('user.id'))
 )
 
+
 def as_dict(m):
-    d={}
+    d = {}
     for c in m.__table__.columns:
-        d[c.name]=getattr(m, c.name)
+        d[c.name] = getattr(m, c.name)
         if isinstance(d[c.name], datetime.date):
-            d[c.name]=str(d[c.name])
+            d[c.name] = str(d[c.name])
     return d
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -59,25 +56,26 @@ class User(db.Model):
     nickname = db.Column(db.String(64), unique=True, index=True)
     email = db.Column(db.String(120), unique=True, index=True)
     role = db.Column(db.Integer, default=ROLE_USER)
-    last_seen =db.Column(db.DateTime())
+    last_seen = db.Column(db.DateTime())
 
-    feeds = db.relationship('Subscription', secondary=usersubscriptions,
-                            backref=db.backref('followers', lazy='dynamic'))
+    subscriptions = db.relationship('Subscription', backref=db.backref('subscriber'), lazy='dynamic')
+
+    feeds = db.relationship('Feed', backref=db.backref('owner'), lazy='dynamic')
 
     likes = db.relationship('Article', secondary=articlelikes,
                             backref=db.backref('likers', lazy='dynamic'))
 
-    def avatar(self,size):
-        return 'http://www.gravatar.com/avatar/' + md5 (self.email).hexdigest() + '?d=mm&s=' + str(size)
+    def avatar(self, size):
+        return 'http://www.gravatar.com/avatar/' + md5(self.email).hexdigest() + '?d=mm&s=' + str(size)
 
     @staticmethod
     def make_unique_nickname(nickname):
-        if User.query.filter_by(nickname = nickname).first() == None:
+        if User.query.filter_by(nickname=nickname).first() == None:
             return nickname
         version = 2
         while True:
             new_nickname = nickname + str(version)
-            if User.query.filter_by(nickname = new_nickname).first() == None:
+            if User.query.filter_by(nickname=new_nickname).first() == None:
                 break
             version += 1
         return new_nickname
@@ -102,9 +100,8 @@ class Feed(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), index=True)
     public = db.Column(db.Boolean, default=True)
-
-    creator = db.Column(db.Integer, db.ForeignKey('user.id'))
     timestamp = db.Column(db.DateTime)
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     authors = db.relationship('Author', secondary=feedauthors,
                               backref=db.backref('authors', lazy='dynamic'))
@@ -115,13 +112,15 @@ class Feed(db.Model):
     categories = db.relationship('Category', secondary=feedcategories,
                                  backref=db.backref('feeds', lazy='dynamic'))
 
+    subscriptions = db.relationship('Subscription', backref=db.backref('feed'),lazy='dynamic')
+
     def feed_articles(self):
-        conditions=[]
+        conditions = []
         for a in self.authors:
-            conditions.append(Article.authors.has(Author.id==a.id))
+            conditions.append(Article.authors.any(Author.id == a.id))
         for kw in self.keywords:
-            conditions.append(Article.title.ilike('%'+kw+'%'))
-            conditions.append(Article.abstract.ilike('%'+kw+'%'))
+            conditions.append(Article.title.ilike('%' + kw.keyword + '%'))
+            conditions.append(Article.abstract.ilike('%' + kw.keyword + '%'))
 
         q = Article.query.filter(or_(*conditions))
         return q
@@ -132,7 +131,13 @@ class Subscription(db.Model):
     enable_email = db.Column(db.Boolean, default=False)
     email_frequency = db.Column(db.Integer, default=EFREQ_DAILY)
 
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     feed_id = db.Column(db.Integer, db.ForeignKey('feed.id'))
+
+    # def __init__(self, id=None, subscriber=None, feed=None, enable_email=None,email_frequency=None):
+    #     self.feed = feed
+    #     self.subscriber = subscriber
+    #     super(Subscription).__init__(self,id=id,enable_email=enable_email,email_frequency=email_frequency)
 
 
 class Author(db.Model):
@@ -142,6 +147,9 @@ class Author(db.Model):
 
     associations = db.relationship('ArticleAuthor', backref='author')
     articles = association_proxy('associations', 'article')
+
+    def __repr__(self):
+        return self.forenames + ' ' + self.lastname
 
 
 #intermediate table used for ordering authors within articles
@@ -189,10 +197,14 @@ class Keyword(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     keyword = db.Column(db.String(120), index=True, unique=True)
 
+    def __repr__(self):
+        return self.keyword
+
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True)
 
-
+    def __repr__(self):
+        return self.name
 
