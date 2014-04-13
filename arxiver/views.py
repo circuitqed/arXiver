@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify
 from flask.ext.login import login_user, logout_user, current_user, login_required
 from arxiver import app, db, lm, oid, ARTICLES_PER_PAGE
-from forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm
+from forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm
 #from models import User, ROLE_USER, ROLE_ADMIN
 from models import *
 
@@ -106,6 +106,7 @@ def index(page=1, query=None):
     else:
         articles = []
     return render_template('index.html', user=g.user, articles=articles)
+
 
 
 @app.route('/search/advanced', methods=['GET', 'POST'])
@@ -234,6 +235,24 @@ def feed(id=None, page=1):
             articles = None
     return render_template('feed.html', feed=f, form=form, articles=articles)
 
+
+@app.route('/edit', methods = ['GET', 'POST'])
+@login_required
+def edit():
+    form = EditForm(g.user.nickname)
+    if form.validate_on_submit():
+        g.user.nickname = form.nickname.data
+        g.user.fullname = form.fullname.data
+        g.user.enable_email = form.enable_email.data
+        g.user.email_frequency = form.email_frequency.data
+        db.session.add(g.user)
+        db.session.commit()
+        flash('Your changes have been saved.')
+        return redirect(url_for('edit'))
+    else:
+        form.nickname.data= g.user.nickname
+        form.fullname.data= g.user.fullname
+    return render_template('edit.html', form=form)
 
 @app.route('/about')
 def about():

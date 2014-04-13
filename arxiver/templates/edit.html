@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block header %}
+    <h1>Edit Your Profile</h1>
+{% endblock %}
+{% block content %}
+
+    <form action="" method="post" name="edit">
+        {{ form.hidden_tag() }}
+        <table>
+            <tr>
+                <td>Your fullname:</td>
+                <td>{{ form.fullname(size = 64, class_='form-control') }}</td>
+            </tr>
+            <tr>
+                <td>Your nickname:</td>
+                <td>
+                    {{ form.nickname(size = 24, class_='form-control') }}
+                    {% for error in form.errors.nickname %}
+                        <br> <span style="color: red;">[{{ error }}]</span>
+                    {% endfor %}
+                </td>
+            </tr>
+            <tr>
+                <td>Receive subscription' via email:</td>
+                <td>{{ form.enable_email() }} {{ form.email_frequency() }}</td>
+            </tr>
+            <tr></tr>
+            <tr>
+                <td></td>
+                <td><input type="submit" value="Save Changes" class="btn btn-default"></td>
+            </tr>
+        </table>
+    </form>
+{% endblock %}
