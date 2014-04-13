@@ -57,6 +57,8 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, index=True)
     role = db.Column(db.Integer, default=ROLE_USER)
     last_seen = db.Column(db.DateTime())
+    enable_email = db.Column(db.Boolean)
+    email_frequency = db.Column(db.Integer)
 
     subscriptions = db.relationship('Subscription', backref=db.backref('subscriber'), lazy='dynamic')
 
@@ -114,14 +116,17 @@ class Feed(db.Model):
 
     subscriptions = db.relationship('Subscription', backref=db.backref('feed'),lazy='dynamic')
 
-    def feed_articles(self):
+    def feed_conditions(self):
         conditions = []
         for a in self.authors:
             conditions.append(Article.authors.any(Author.id == a.id))
         for kw in self.keywords:
             conditions.append(Article.title.ilike('%' + kw.keyword + '%'))
             conditions.append(Article.abstract.ilike('%' + kw.keyword + '%'))
+        return conditions
 
+    def feed_articles(self):
+        conditions = self.feed_conditions()
         q = Article.query.filter(or_(*conditions))
         return q
 

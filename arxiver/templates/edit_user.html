@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-
-{% block content %}
+{% block header %}
 <h1>Edit Your Profile</h1>
+{% endblock %}
+{% block content %}
+
 <form action="" method="post" name="edit">
   {{form.hidden_tag()}}
   <table>

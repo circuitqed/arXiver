@@ -1,29 +1,25 @@
 {% extends "base.html" %}
-{% block content %}
-    <h1>Author: {{ author.forenames }} {{ author.lastname }}</h1>
+{% block header %}
+    <h2>Author: {{ author.forenames }} {{ author.lastname }}</h2>
+{% endblock %}
 
-    <hr/>
-    <h3>Similar names</h3>
-    <div>
+{% block nav_content %}
+  <ul class="nav nav-list">
+        <li class="nav-header">Similar Names</li>
         {% for sa in similar_authors %}
-            <a href="{{ url_for('author', id=sa.id) }}">{{ sa.forenames }} {{ sa.lastname }}</a>{% if not loop.last %},
-        {% endif %}
+            <li><a href="{{ url_for('author', id=sa.id) }}">{{ sa.forenames }} {{ sa.lastname }}</a></li>
         {% endfor %}
-    </div>
-    <hr/>
-    <div>
-        <h3>Collaborators</h3>
-
-        <p>Todo</p>
-    </div>
-    <h3>Papers</h3>
-
-    <ol>
-        {% for article in author.articles %}
-            <li>
-                {{ render_article(article) }}
-            </li>
+        <li class="nav-header">Collaborators</li>
+         {% for c in collaborators %}
+            <li><a href="{{ url_for('author', id=c.id) }}">{{ c.forenames }} {{ c.lastname }}</a></li>
         {% endfor %}
-    </ol>
+
+    </ul>
+{% endblock %}
+
+{% block content %}
+
+    {{ render_articles(articles,'author') }}
+
 {% endblock %}
 

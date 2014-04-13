@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block header %}
+    <h1> Search</h1>
+{% endblock %}
+
+{% block content %}
+
+    <form action="" method="post" name="search">
+        {{ form.hidden_tag() }}
+       <table>
+            <tr>
+                <td>Title:</td>
+                <td>{{ form.title(size=64) }}</td>
+            </tr>
+            <tr>
+                <td>Author:</td>
+                <td id="remote">{{ form.author(size=64,class_="typeahead") }}</td>
+            </tr>
+            <tr>
+                <td>Keyword</td>
+                <td>{{ form.keyword(size=64) }}</td>
+            </tr>
+            <tr>
+                <td>Categories:</td>
+                <td>{{ form.category }}</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><input type="submit" value="Search"></td>
+            </tr>
+        </table>
+
+    </form>
+
+    <hr/>
+
+    {{ render_articles(articles) }}
+
+
+{% endblock %}

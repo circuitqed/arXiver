@@ -1,10 +1,12 @@
 {% extends "base.html" %}
-{% block content %}
-    <h1>{{ user.nickname }}</h1>
-    <div>{{ user.fullname }}</div>
-    <div>{{ user.email }}</div>
+{% block header %}
+    <h1>{{ user.fullname }} ({{ user.nickname }})</h1>
+        <div>Email: {{ user.email }}</div>
 
-    <h3>Followed feeds:</h3>
+{% endblock %}
+{% block content %}
+
+    <h2>Followed feeds:</h2>
 
     <a href="{{ url_for('feed',id=None) }}">New Feed</a>
     <table>

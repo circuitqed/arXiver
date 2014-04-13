@@ -43,7 +43,8 @@ class SearchForm(Form):
     category = SelectMultipleField(choices=[(c.name, c.name) for c in Category.query.order_by('name')])
     year = TextField('year')
 
-
+class SimpleSearchForm(Form):
+    query = TextField('query')
 
 #learned from https://gist.github.com/kageurufu/6813878
 class FeedForm(Form):
@@ -81,6 +82,7 @@ class FeedForm(Form):
         obj.timestamp=datetime.datetime.utcnow()
         obj.authors=authors
         obj.keywords=kws
+        return obj
 
 
     def init_form(self,obj):

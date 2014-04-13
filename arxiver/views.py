@@ -1,10 +1,10 @@
 __author__ = 'dave'
 
 from datetime import datetime
-from flask import render_template, redirect, flash, session, url_for, request, g
+from flask import render_template, redirect, flash, session, url_for, request, g, jsonify
 from flask.ext.login import login_user, logout_user, current_user, login_required
-from arxiver import app, db, lm, oid
-from forms import LoginForm, SearchForm, FeedForm
+from arxiver import app, db, lm, oid, ARTICLES_PER_PAGE
+from forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm
 #from models import User, ROLE_USER, ROLE_ADMIN
 from models import *
 
@@ -75,7 +75,7 @@ def after_login(resp):
         remember_me = session['remember_me']
         session.pop('remember_me', None)
     if login_user(user, remember=remember_me):
-        flash(user.nickname + ' logged in Succesfully')
+        flash(user.nickname + ' logged in Successfully')
     return redirect(request.args.get('next') or url_for('index'))
 
 
@@ -86,7 +86,30 @@ def logout():
 
 
 @app.route('/', methods=['GET', 'POST'])
-def index():
+@app.route('/page/<int:page>',methods=['GET', 'POST'])
+@app.route('/search/<string:query>',methods=['GET', 'POST'])
+@app.route('/search/<string:query>/page/<int:page>',methods=['GET', 'POST'])
+def index(page=1, query=None):
+    if request.method == 'POST':
+        return redirect(url_for('index', query=request.form['query']))
+    if query is not None:
+        articles = Article.query.filter(
+            or_(Article.title.ilike('%' + query + '%'), Article.abstract.ilike('%' + query + '%'),
+                Article.authors.any(Author.lastname.ilike(query+"%")))).paginate(page,ARTICLES_PER_PAGE,False)
+        return render_template('index.html',user=g.user, articles=articles)
+    if g.user is not None and not g.user.is_anonymous():
+        conditions = []
+        for s in g.user.subscriptions:
+            print s.feed.name
+            conditions += s.feed.feed_conditions()
+            articles = Article.query.filter(or_(*conditions)).paginate(page, ARTICLES_PER_PAGE, False)
+    else:
+        articles = []
+    return render_template('index.html', user=g.user, articles=articles)
+
+
+@app.route('/search/advanced', methods=['GET', 'POST'])
+def search():
     form = SearchForm()
     articles = None
     if form.validate_on_submit():
@@ -97,18 +120,13 @@ def index():
             conditions.append(or_(Article.title.ilike('%' + form.keyword.data + '%'),
                                   Article.abstract.ilike('%' + form.keyword.data + '%')))
         if form.author.data != '':
-            conditions.append(Article.authors.any(Author.lastname.ilike(form.author.data)))
+            conditions.append(Article.authors.any(Author.lastname.ilike(form.author.data + "%")))
         if form.category.data != '':
             for cname in form.category.data:
                 conditions.append(Category.name.ilike(cname + '%'))
         if conditions:
             articles = Article.query.filter(and_(*conditions))
-    return render_template('index.html', form=form, articles=articles)
-
-
-@app.route('/test')
-def test():
-    print [c.name for c in Category.query.all()]
+    return render_template('search.html', form=form, articles=articles,navsearch=SimpleSearchForm())
 
 
 @app.route('/article/<id>')
@@ -131,55 +149,92 @@ def user(nickname):
     return render_template('user.html', user=user)
 
 
-@app.route('/author/<id>')
-def author(id):
+@app.route('/author/<int:id>')
+@app.route('/author/<int:id>/page/<int:page>')
+def author(id, page=1):
     author = Author.query.filter_by(id=id).first()
     if author == None:
         flash('Author #' + id + ' not found.')
         return redirect(url_for('index'))
 
-    similar_authors = Author.query.filter(Author.lastname.ilike(author.lastname)).filter(
-        Author.forenames.ilike(author.forenames[0] + '%'))
+    similar_authors = Author.query.filter(Author.lastname.ilike(author.lastname),
+                                          Author.forenames.ilike(author.forenames[0] + '%'), Author.id != id)
 
-    return render_template('author.html', author=author, similar_authors=similar_authors)
+    author_articles = Article.query.filter(Article.authors.any(Author.id == author.id)).paginate(page,
+                                                                                                 ARTICLES_PER_PAGE,
+                                                                                                 False)
+    print "finding collaborators"
+    q1 = ArticleAuthor.query.filter(ArticleAuthor.author_id == id)
+    q2 = ArticleAuthor.query.filter(ArticleAuthor.article_id.in_([aa.article_id for aa in q1.all()]),
+                                    ArticleAuthor.author_id != id)
+    cset = set([cs.author_id for cs in q2.all()])
+    collaborators = Author.query.filter(Author.id.in_(cset)).order_by(Author.lastname).limit(10)
+    print "found collaborators"
+
+    return render_template('author.html', author=author, similar_authors=similar_authors, articles=author_articles,
+                           collaborators=collaborators)
+
+
+@app.route('/autocomplete/author/<search_term>')
+def autocomplete_author(search_term):
+    print 'autocomplete author'
+    names = search_term.split(' ')
+    conditions = []
+    conditions.append(Author.lastname.ilike(names[-1] + '%'))
+    if len(names) > 1:
+        conditions.append(Author.forenames.ilike(search_term[0] + '%'))
+    similar_authors = Author.query.filter(and_(*conditions)).limit(10).with_entities(Author.id, Author.forenames,
+                                                                                     Author.lastname)
+    alist = [{'id': a.id, 'forenames': a.forenames, 'lastname': a.lastname} for a in similar_authors]
+    print alist
+
+    return jsonify(authors=alist)
+
+
+@app.route('/autocomplete/keyword/<search_term>')
+def autocomplete_keyword(search_term):
+    keywords = Keyword.query.filter(Keyword.keyword.ilike(search_term + '%')).limit(10)
+    return jsonify(keywords=[{'id': k.id, 'keyword': k.keyword} for k in keywords])
 
 
 @app.route('/feed/<id>', methods=['GET', 'POST'])
+@app.route('/feed/<id>/page/<int:page>', methods=['GET', 'POST'])
 @app.route('/feed/new', methods=['GET', 'POST'])
 @login_required
-def feed(id=None):
+def feed(id=None, page=1):
     if id is None:
         f = None
     else:
         f = Feed.query.filter(Feed.id == id).first()
-    newfeed = f is None
 
-    form = FeedForm(request.form, f)
-    print form
-
+    form = FeedForm()
     if form.validate_on_submit():
         print 'validated'
-        if newfeed:
+        if f is None:
             f = Feed()
             g.user.feeds.append(f)
-            s = Subscription(subscriber=g.user, feed=f, enable_email=form.enable_email.data,
-                             email_frequency=form.email_frequency.data)
-        form.populate_obj(f)
-
-        # if newfeed:
-        #     g.user.feeds.append(f)
-        #     db.session.add(g.user)
-        # else:
-        #     db.session.add(f)
+            s = None
+        else:
+            s = Subscription.query.filter(and_(Subscription.feed_id == id, Subscription.user_id == g.user.id)).first()
+        if s is None:
+            s = Subscription(subscriber=g.user, feed=f)
+        f = form.populate_obj(f)
+        s.enable_email = form.enable_email.data
+        s.email_frequency = form.email_frequency.data
 
         db.session.add(f)
         db.session.commit()
         flash('Feed updated.')
         return redirect(url_for('feed', id=f.id))
-
-    if f is not None:
-        articles=f.feed_articles().all()
-        print len(articles)
     else:
-        articles=None
-    return render_template('feed.html', feed=f, form=form,articles=articles)
+        form = FeedForm(request.form, f)
+        if f is not None:
+            articles = f.feed_articles().paginate(page, ARTICLES_PER_PAGE, False)
+        else:
+            articles = None
+    return render_template('feed.html', feed=f, form=form, articles=articles)
+
+
+@app.route('/about')
+def about():
+    return render_template('about.html')

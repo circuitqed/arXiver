@@ -15,6 +15,8 @@ OPENID_PROVIDERS = [
 SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'arxiver.db')
 SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
 
+ARTICLES_PER_PAGE = 10
+
 # mail server settings
 MAIL_SERVER = 'localhost'
 MAIL_PORT = 8025

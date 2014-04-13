@@ -1,12 +1,13 @@
 __author__ = 'dave'
 
 import os
-from flask import Flask
+from flask import Flask,url_for,request
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.orderinglist import ordering_list
 from flask.ext.login import LoginManager
 from flask.ext.openid import OpenID
 from config import basedir
+from config import ARTICLES_PER_PAGE
 from config import ADMINS, MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
 from flask.ext.restful import Api
 
@@ -19,6 +20,17 @@ lm = LoginManager()
 lm.init_app(app)
 lm.login_view = 'login'
 oid = OpenID(app,os.path.join(basedir,'tmp'))
+
+def url_for_other_page(page):
+    args = request.view_args.copy()
+    args['page'] = page
+    return url_for(request.endpoint, **args)
+
+def datetimeformat(value, format='%H:%M / %d-%m-%Y'):
+    return value.strftime(format)
+
+app.jinja_env.filters['datetimeformat'] = datetimeformat
+app.jinja_env.globals['url_for_other_page'] = url_for_other_page
 
 if not app.debug:
     import logging

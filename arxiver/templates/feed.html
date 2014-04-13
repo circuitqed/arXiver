@@ -1,5 +1,9 @@
 {% extends "base.html" %}
-{% block content %}
+{% block header %}
+<h1>Edit Feed</h1>
+{% endblock %}
+
+{% block nav_content %}
     <form action="" method="post" name="feed">
         {{ form.hidden_tag() }}
         <div>
@@ -20,7 +24,7 @@
                 </tr>
                 {% for author in form.authors.data %}
                     <tr class="removable-field-row">
-                        <td><input id="authors-{{ loop.index - 1 }}" name="authors-{{ loop.index - 1}}" type="text"
+                        <td><input id="authors-{{ loop.index - 1 }}" name="authors-{{ loop.index - 1}}" type="text" class="removable-field-input"
                                    value="{{ author.id }}"></td>
                         <td>
                             <button type="button" class="removable-field-button">&times;</button>
@@ -56,16 +60,11 @@
             </table>
         </div>
 
-        <input type="submit" name="Save"/>
-
+        <input type="submit" class="btn btn-default" name="Save" value="Save"/>
 
     </form>
-    <hr/>
-    <div>
-        <ol>
-        {% for article in feed.feed_articles() %}
-        <li>{{ render_article(article) }}</li>
-        {% endfor %}
-        </ol>
-    </div>
+{% endblock %}
+{% block content %}
+
+    {{ render_articles(articles,'feed') }}
 {% endblock %}

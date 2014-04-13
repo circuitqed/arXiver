@@ -1,4 +1,9 @@
 {% extends "base.html" %}
+
+{% block header %}
+<h2>{{ article.arxiv_id }} - {{ article.title }}</h2>
+{% endblock %}
+
 {% block content %}
     <div>
         {{ render_article(article) }}

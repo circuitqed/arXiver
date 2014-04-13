@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block header %}
+    <h1>Sign In</h1>
+{% endblock %}
 
 {% block content %}
     <script type="text/javascript">
@@ -14,7 +17,7 @@
         }
     </script>
 
-    <h1>Sign In</h1>
+
     <form action="" method="post" name="login">
         {{ form.hidden_tag() }}
         <p>
