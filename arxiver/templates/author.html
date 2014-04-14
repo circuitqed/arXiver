@@ -11,7 +11,7 @@
         {% endfor %}
         <li class="nav-header">Collaborators</li>
          {% for c in collaborators %}
-            <li><a href="{{ url_for('author', id=c.id) }}">{{ c.forenames }} {{ c.lastname }}</a></li>
+            <li><a href="{{ url_for('author', id=c[0].id) }}">{{ c[0].forenames }} {{ c[0].lastname }} ({{ c[1] }})</a></li>
         {% endfor %}
 
     </ul>

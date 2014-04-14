@@ -150,6 +150,7 @@ def user(nickname):
     return render_template('user.html', user=user)
 
 
+#select author_id from articlesauthors, (select article_id as aid from articlesauthors where (author_id=6)) where (author_id=aid)
 @app.route('/author/<int:id>')
 @app.route('/author/<int:id>/page/<int:page>')
 def author(id, page=1):
@@ -158,22 +159,12 @@ def author(id, page=1):
         flash('Author #' + id + ' not found.')
         return redirect(url_for('index'))
 
-    similar_authors = Author.query.filter(Author.lastname.ilike(author.lastname),
-                                          Author.forenames.ilike(author.forenames[0] + '%'), Author.id != id)
-
     author_articles = Article.query.filter(Article.authors.any(Author.id == author.id)).paginate(page,
                                                                                                  ARTICLES_PER_PAGE,
                                                                                                  False)
-    print "finding collaborators"
-    q1 = ArticleAuthor.query.filter(ArticleAuthor.author_id == id)
-    q2 = ArticleAuthor.query.filter(ArticleAuthor.article_id.in_([aa.article_id for aa in q1.all()]),
-                                    ArticleAuthor.author_id != id)
-    cset = set([cs.author_id for cs in q2.all()])
-    collaborators = Author.query.filter(Author.id.in_(cset)).order_by(Author.lastname).limit(10)
-    print "found collaborators"
 
-    return render_template('author.html', author=author, similar_authors=similar_authors, articles=author_articles,
-                           collaborators=collaborators)
+    return render_template('author.html', author=author, similar_authors=author.similar_authors().limit(10), articles=author_articles,
+                           collaborators=author.collaborators().limit(10))
 
 
 @app.route('/autocomplete/author/<search_term>')

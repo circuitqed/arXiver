@@ -4,7 +4,7 @@ from hashlib import md5
 from arxiver import db
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func
 
 import datetime
 
@@ -30,7 +30,8 @@ feedcategories = db.Table('feedcategories',
                           db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
 )
 
-articlescategories = db.Table('articlescategories',
+articlescategories = db.Table('articlescategories'
+                              '',
                               db.Column('article_id', db.Integer, db.ForeignKey('article.id')),
                               db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
 )
@@ -114,7 +115,7 @@ class Feed(db.Model):
     categories = db.relationship('Category', secondary=feedcategories,
                                  backref=db.backref('feeds', lazy='dynamic'))
 
-    subscriptions = db.relationship('Subscription', backref=db.backref('feed'),lazy='dynamic')
+    subscriptions = db.relationship('Subscription', backref=db.backref('feed'), lazy='dynamic')
 
     def feed_conditions(self):
         conditions = []
@@ -152,6 +153,18 @@ class Author(db.Model):
 
     associations = db.relationship('ArticleAuthor', backref='author')
     articles = association_proxy('associations', 'article')
+
+    def collaborators(self):
+        articles_q = db.session.query(ArticleAuthor.article_id).filter_by(author_id=self.id).subquery()
+        q = db.session.query(Author, func.count()).join(Author.associations).filter(
+            ArticleAuthor.article_id.in_(articles_q), ArticleAuthor.author_id != self.id).group_by(Author.id).order_by(
+            func.count().desc())
+        return q
+
+    def similar_authors(self):
+        return Author.query.filter(Author.lastname.ilike(self.lastname),
+                                   Author.forenames.ilike(self.forenames[0] + '%'), Author.id != self.id)
+
 
     def __repr__(self):
         return self.forenames + ' ' + self.lastname
