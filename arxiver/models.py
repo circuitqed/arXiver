@@ -185,16 +185,16 @@ class ArticleAuthor(db.Model):
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     arxiv_id = db.Column(db.String(64), index=True, unique=True)
-    title = db.Column(db.String(120))
-    abstract = db.Column(db.String(2000), index=True)
-    comments = db.Column(db.String(120))
+    title = db.Column(db.String(),index=True)
+    abstract = db.Column(db.String(), index=True)
+    comments = db.Column(db.String())
     created = db.Column(db.Date(), index=True)
     updated = db.Column(db.Date(), index=True)
     doi = db.Column(db.String(120), index=True)
-    journalref = db.Column(db.String(120), index=True)
-    mscclass = db.Column(db.String(120))
-    acmclass = db.Column(db.String(120))
-    license = db.Column(db.String(120))
+    journalref = db.Column(db.String(), index=True)
+    mscclass = db.Column(db.String(120),index=True)
+    acmclass = db.Column(db.String(120),index=True)
+    license = db.Column(db.String())
 
     #These set up the ordered list of authors
     associations = db.relationship('ArticleAuthor',

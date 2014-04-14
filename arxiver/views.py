@@ -86,27 +86,31 @@ def logout():
 
 
 @app.route('/', methods=['GET', 'POST'])
-@app.route('/page/<int:page>',methods=['GET', 'POST'])
-@app.route('/search/<string:query>',methods=['GET', 'POST'])
-@app.route('/search/<string:query>/page/<int:page>',methods=['GET', 'POST'])
+@app.route('/page/<int:page>', methods=['GET', 'POST'])
+@app.route('/search/<string:query>', methods=['GET', 'POST'])
+@app.route('/search/<string:query>/page/<int:page>', methods=['GET', 'POST'])
 def index(page=1, query=None):
+    articles = None
     if request.method == 'POST':
         return redirect(url_for('index', query=request.form['query']))
     if query is not None:
+        print "running query"
         articles = Article.query.filter(
             or_(Article.title.ilike('%' + query + '%'), Article.abstract.ilike('%' + query + '%'),
-                Article.authors.any(Author.lastname.ilike(query+"%")))).paginate(page,ARTICLES_PER_PAGE,False)
-        return render_template('index.html',user=g.user, articles=articles)
+                Article.authors.any(Author.lastname.ilike(query + "%")))).paginate(page, ARTICLES_PER_PAGE, False)
+        print "query finished"
+        return render_template('index.html', user=g.user, articles=articles)
     if g.user is not None and not g.user.is_anonymous():
         conditions = []
+        subscribed = False
         for s in g.user.subscriptions:
+            subscribed = True
             print s.feed.name
             conditions += s.feed.feed_conditions()
             articles = Article.query.filter(or_(*conditions)).paginate(page, ARTICLES_PER_PAGE, False)
-    else:
-        articles = None
+        if not subscribed:
+            articles = Article.query.paginate(page, ARTICLES_PER_PAGE, False)
     return render_template('index.html', user=g.user, articles=articles)
-
 
 
 @app.route('/search/advanced', methods=['GET', 'POST'])
@@ -127,7 +131,7 @@ def search():
                 conditions.append(Category.name.ilike(cname + '%'))
         if conditions:
             articles = Article.query.filter(and_(*conditions))
-    return render_template('search.html', form=form, articles=articles,navsearch=SimpleSearchForm())
+    return render_template('search.html', form=form, articles=articles, navsearch=SimpleSearchForm())
 
 
 @app.route('/article/<id>')
@@ -156,14 +160,15 @@ def user(nickname):
 def author(id, page=1):
     author = Author.query.filter_by(id=id).first()
     if author == None:
-        flash('Author #' + id + ' not found.')
+        flash('Author #' + str(id) + ' not found.')
         return redirect(url_for('index'))
 
     author_articles = Article.query.filter(Article.authors.any(Author.id == author.id)).paginate(page,
                                                                                                  ARTICLES_PER_PAGE,
                                                                                                  False)
 
-    return render_template('author.html', author=author, similar_authors=author.similar_authors().limit(10), articles=author_articles,
+    return render_template('author.html', author=author, similar_authors=author.similar_authors().limit(10),
+                           articles=author_articles,
                            collaborators=author.collaborators().limit(10))
 
 
@@ -227,7 +232,7 @@ def feed(id=None, page=1):
     return render_template('feed.html', feed=f, form=form, articles=articles)
 
 
-@app.route('/edit', methods = ['GET', 'POST'])
+@app.route('/edit', methods=['GET', 'POST'])
 @login_required
 def edit():
     form = EditForm(g.user.nickname)
@@ -241,9 +246,10 @@ def edit():
         flash('Your changes have been saved.')
         return redirect(url_for('edit'))
     else:
-        form.nickname.data= g.user.nickname
-        form.fullname.data= g.user.fullname
+        form.nickname.data = g.user.nickname
+        form.fullname.data = g.user.fullname
     return render_template('edit.html', form=form)
+
 
 @app.route('/about')
 def about():

@@ -40,11 +40,17 @@ class SearchForm(Form):
     title = TextField('title')
     author = TextField('author')
     keyword = TextField('keyword')
-    category = SelectMultipleField(choices=[(c.name, c.name) for c in Category.query.order_by('name')])
+    category = SelectMultipleField()
     year = TextField('year')
+
+    def __index__(self, *args, **kwargs):
+        super.__init__(self, *args, **kwargs)
+        self.category.choices = [(c.name, c.name) for c in Category.query.order_by('name')]
+
 
 class SimpleSearchForm(Form):
     query = TextField('query')
+
 
 #learned from https://gist.github.com/kageurufu/6813878
 class FeedForm(Form):
@@ -59,10 +65,10 @@ class FeedForm(Form):
         authors = []
         for author_id in self.authors.data:
             try:
-                aid=int(author_id)
+                aid = int(author_id)
                 a = Author.query.filter(Author.id == aid).first()
             except:
-                a=None
+                a = None
             if a is not None:
                 authors.append(a)
         #print "authors: " , authors
@@ -77,19 +83,19 @@ class FeedForm(Form):
                 #db.session.commit()
             kws.append(kw)
 
-        obj.public=self.public.data
-        obj.name=self.name.data
-        obj.timestamp=datetime.datetime.utcnow()
-        obj.authors=authors
-        obj.keywords=kws
+        obj.public = self.public.data
+        obj.name = self.name.data
+        obj.timestamp = datetime.datetime.utcnow()
+        obj.authors = authors
+        obj.keywords = kws
         return obj
 
 
-    def init_form(self,obj):
-        self.name.data=obj.name
-        self.public.data=obj.public
-        self.enable_email.data=obj.enable_email
-        self.email_frequency.data=obj.email_frequency
+    def init_form(self, obj):
+        self.name.data = obj.name
+        self.public.data = obj.public
+        self.enable_email.data = obj.enable_email
+        self.email_frequency.data = obj.email_frequency
         for author in obj.authors:
             self.authors.append(str(author.id))
         for keyword in obj.keywords:
@@ -97,12 +103,11 @@ class FeedForm(Form):
 
 
 class EditForm(Form):
-    nickname = TextField('nickname', validators = [Required()])
+    nickname = TextField('nickname', validators=[Required()])
     fullname = TextField('fullname')
     email = TextField('email')
     enable_email = BooleanField('Email subscribe')
     email_frequency = SelectField('Frequency', choices=( ('0', 'Daily'), ('1', 'Weekly'), ('2', 'Monthly')))
-
 
 
     def __init__(self, original_nickname, *args, **kwargs):
@@ -114,7 +119,7 @@ class EditForm(Form):
             return False
         if self.nickname.data == self.original_nickname:
             return True
-        user = User.query.filter_by(nickname = self.nickname.data).first()
+        user = User.query.filter_by(nickname=self.nickname.data).first()
         if user != None:
             self.nickname.errors.append('This nickname is already in use. Please choose another one.')
             return False
