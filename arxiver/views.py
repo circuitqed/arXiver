@@ -104,7 +104,7 @@ def index(page=1, query=None):
             conditions += s.feed.feed_conditions()
             articles = Article.query.filter(or_(*conditions)).paginate(page, ARTICLES_PER_PAGE, False)
     else:
-        articles = []
+        articles = None
     return render_template('index.html', user=g.user, articles=articles)
 
 
