@@ -75,13 +75,14 @@ class FeedForm(Form):
 
         kws = []
         for k in self.keywords.data:
-            kw = Keyword.query.filter(Keyword.keyword.ilike(k)).first()
-            if kw is None:
-                kw = Keyword(keyword=k)
-                print kw.keyword
-                db.session.add(kw)
-                #db.session.commit()
-            kws.append(kw)
+            if k != '':
+                kw = Keyword.query.filter(Keyword.keyword.ilike(k)).first()
+                if kw is None:
+                    kw = Keyword(keyword=k)
+                    print kw.keyword
+                    db.session.add(kw)
+                    #db.session.commit()
+                kws.append(kw)
 
         obj.public = self.public.data
         obj.name = self.name.data

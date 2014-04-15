@@ -97,7 +97,8 @@ def index(page=1, query=None):
         print "running query"
         articles = Article.query.filter(
             or_(Article.title.ilike('%' + query + '%'), Article.abstract.ilike('%' + query + '%'),
-                Article.authors.any(Author.lastname.ilike(query + "%")))).paginate(page, ARTICLES_PER_PAGE, False)
+                Article.authors.any(Author.lastname.ilike(query + "%")))).order_by(Article.created.desc()).paginate(
+            page, ARTICLES_PER_PAGE, False)
         print "query finished"
         return render_template('index.html', user=g.user, articles=articles)
     if g.user is not None and not g.user.is_anonymous():
@@ -105,11 +106,10 @@ def index(page=1, query=None):
         subscribed = False
         for s in g.user.subscriptions:
             subscribed = True
-            print s.feed.name
-            conditions += s.feed.feed_conditions()
-            articles = Article.query.filter(or_(*conditions)).paginate(page, ARTICLES_PER_PAGE, False)
+            articles = s.feed.feed_articles().paginate(page, ARTICLES_PER_PAGE, False)
         if not subscribed:
-            articles = Article.query.paginate(page, ARTICLES_PER_PAGE, False)
+            print "Not subscribed"
+            articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
     return render_template('index.html', user=g.user, articles=articles)
 
 
@@ -163,9 +163,8 @@ def author(id, page=1):
         flash('Author #' + str(id) + ' not found.')
         return redirect(url_for('index'))
 
-    author_articles = Article.query.filter(Article.authors.any(Author.id == author.id)).paginate(page,
-                                                                                                 ARTICLES_PER_PAGE,
-                                                                                                 False)
+    author_articles = Article.query.filter(Article.authors.any(Author.id == author.id)).order_by(
+        Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
 
     return render_template('author.html', author=author, similar_authors=author.similar_authors().limit(10),
                            articles=author_articles,

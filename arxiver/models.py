@@ -53,9 +53,9 @@ def as_dict(m):
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    fullname = db.Column(db.String(120), index=True)
+    fullname = db.Column(db.String(), index=True)
     nickname = db.Column(db.String(64), unique=True, index=True)
-    email = db.Column(db.String(120), unique=True, index=True)
+    email = db.Column(db.String(), unique=True, index=True)
     role = db.Column(db.Integer, default=ROLE_USER)
     last_seen = db.Column(db.DateTime())
     enable_email = db.Column(db.Boolean)
@@ -128,7 +128,7 @@ class Feed(db.Model):
 
     def feed_articles(self):
         conditions = self.feed_conditions()
-        q = Article.query.filter(or_(*conditions))
+        q = Article.query.filter(or_(*conditions)).order_by(Article.created.desc())
         return q
 
 
@@ -148,8 +148,8 @@ class Subscription(db.Model):
 
 class Author(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    forenames = db.Column(db.String(120), index=True)
-    lastname = db.Column(db.String(120), index=True)
+    forenames = db.Column(db.String(), index=True)
+    lastname = db.Column(db.String(), index=True)
 
     associations = db.relationship('ArticleAuthor', backref='author')
     articles = association_proxy('associations', 'article')
@@ -185,15 +185,15 @@ class ArticleAuthor(db.Model):
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     arxiv_id = db.Column(db.String(64), index=True, unique=True)
-    title = db.Column(db.String(),index=True)
+    title = db.Column(db.String(), index=True)
     abstract = db.Column(db.String(), index=True)
     comments = db.Column(db.String())
     created = db.Column(db.Date(), index=True)
     updated = db.Column(db.Date(), index=True)
-    doi = db.Column(db.String(120), index=True)
+    doi = db.Column(db.String(), index=True)
     journalref = db.Column(db.String(), index=True)
-    mscclass = db.Column(db.String(120),index=True)
-    acmclass = db.Column(db.String(120),index=True)
+    mscclass = db.Column(db.String(), index=True)
+    acmclass = db.Column(db.String(), index=True)
     license = db.Column(db.String())
 
     #These set up the ordered list of authors
