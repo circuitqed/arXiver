@@ -63,20 +63,20 @@ def add_article(metadata):
     return a
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
 
     arxiv = Sickle('http://export.arxiv.org/oai2')
 
     date = datetime.date(2014, 2, 14)
 
-    #records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
-    records = arxiv.ListRecords(metadataPrefix= 'arXiv')
+    records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
+    #records = arxiv.ListRecords(metadataPrefix= 'arXiv')
 
-    count=0
-    badrecords=[]
+    count = 0
+    badrecords = []
     for r in records:
-        count+=1
-        if count % 1000==0: print count
+        count += 1
+        if count % 1000 == 0: print count
         try:
             a = add_article(r.metadata)
         except Exception as e:

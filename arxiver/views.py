@@ -95,14 +95,12 @@ def index(page=1, query=None):
         return redirect(url_for('index', query=request.form['query']))
     if query is not None:
         print "running query"
-        articles = Article.query.filter(
-            or_(Article.title.ilike('%' + query + '%'), Article.abstract.ilike('%' + query + '%'),
-                Article.authors.any(Author.lastname.ilike(query + "%")))).order_by(Article.created.desc()).paginate(
+        articles = Article.simple_search(query).paginate(
             page, ARTICLES_PER_PAGE, False)
+
         print "query finished"
         return render_template('index.html', user=g.user, articles=articles)
     if g.user is not None and not g.user.is_anonymous():
-        conditions = []
         subscribed = False
         for s in g.user.subscriptions:
             subscribed = True
@@ -110,6 +108,7 @@ def index(page=1, query=None):
         if not subscribed:
             print "Not subscribed"
             articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
+
     return render_template('index.html', user=g.user, articles=articles)
 
 

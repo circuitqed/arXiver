@@ -6,6 +6,11 @@ from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy import or_, and_, func
 
+#fulltext imports from http://sqlalchemy-searchable.readthedocs.org/en/latest/
+from flask.ext.sqlalchemy import BaseQuery
+from sqlalchemy_searchable import search, make_searchable, parse_search_query
+from sqlalchemy_utils.types import TSVectorType
+
 import datetime
 
 ROLE_USER = 0
@@ -40,6 +45,18 @@ articlelikes = db.Table('articlelikes',
                         db.Column('article_id', db.Integer, db.ForeignKey('article.id')),
                         db.Column('user_id', db.Integer, db.ForeignKey('user.id'))
 )
+
+make_searchable()
+
+
+class SearchQueryMixin(object):
+    def search(self, search_query, vector=None, catalog=None):
+        """
+        Search given query with full text search.
+
+        :param search_query: the search query
+        """
+        return search(self, search_query, vector=vector, catalog=catalog)
 
 
 def as_dict(m):
@@ -121,9 +138,11 @@ class Feed(db.Model):
         conditions = []
         for a in self.authors:
             conditions.append(Article.authors.any(Author.id == a.id))
-        for kw in self.keywords:
-            conditions.append(Article.title.ilike('%' + kw.keyword + '%'))
-            conditions.append(Article.abstract.ilike('%' + kw.keyword + '%'))
+        query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
+        conditions.append(Article.search_vector.match_tsquery(query))
+        # for kw in self.keywords:
+        #     conditions.append(Article.title.ilike('%' + kw.keyword + '%'))
+        #     conditions.append(Article.abstract.ilike('%' + kw.keyword + '%'))
         return conditions
 
     def feed_articles(self):
@@ -182,7 +201,13 @@ class ArticleAuthor(db.Model):
         self.author = author
 
 
+class ArticleQuery(BaseQuery, SearchQueryMixin):
+    pass
+
+
 class Article(db.Model):
+    query_class = ArticleQuery
+
     id = db.Column(db.Integer, primary_key=True)
     arxiv_id = db.Column(db.String(64), index=True, unique=True)
     title = db.Column(db.String(), index=True)
@@ -196,6 +221,11 @@ class Article(db.Model):
     acmclass = db.Column(db.String(), index=True)
     license = db.Column(db.String())
 
+    title_search_vector = db.Column(TSVectorType('title'))
+    abstract_search_vector = db.Column(TSVectorType('abstract'))
+    search_vector = db.Column(TSVectorType('title', 'abstract'))
+
+
     #These set up the ordered list of authors
     associations = db.relationship('ArticleAuthor',
                                    collection_class=ordering_list('position'),
@@ -206,6 +236,13 @@ class Article(db.Model):
 
     categories = db.relationship('Category', secondary=articlescategories,
                                  backref=db.backref('articles', lazy='dynamic'))
+    @staticmethod
+    def simple_search(query):
+        return Article.query.filter(
+            or_(Article.search_vector.match_tsquery(parse_search_query(query)),
+                Article.authors.any(Author.lastname.ilike(query))
+            )).order_by(Article.created.desc())
+
 
     def __repr__(self):
         return self.title
@@ -225,4 +262,5 @@ class Category(db.Model):
 
     def __repr__(self):
         return self.name
+
 

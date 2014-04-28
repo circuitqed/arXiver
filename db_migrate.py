@@ -5,6 +5,12 @@ import imp
 from migrate.versioning import api
 
 from arxiver import db
+
+#for fullsearch maybe
+from flask.ext.sqlalchemy import BaseQuery
+from sqlalchemy_searchable import SearchQueryMixin
+from sqlalchemy_utils.types import TSVectorType
+
 from config import SQLALCHEMY_DATABASE_URI
 from config import SQLALCHEMY_MIGRATE_REPO
 
