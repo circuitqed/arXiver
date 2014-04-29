@@ -69,8 +69,8 @@ if __name__ == '__main__':
 
     date = datetime.date(2014, 2, 14)
 
-    records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
-    #records = arxiv.ListRecords(metadataPrefix= 'arXiv')
+    #records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
+    records = arxiv.ListRecords(metadataPrefix= 'arXiv')
 
     count = 0
     badrecords = []

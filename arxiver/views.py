@@ -1,6 +1,7 @@
 __author__ = 'dave'
 
 from datetime import datetime
+import time
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify
 from flask.ext.login import login_user, logout_user, current_user, login_required
 from arxiver import app, db, lm, oid, ARTICLES_PER_PAGE
@@ -30,6 +31,7 @@ def load_user(id):
 @app.before_request
 def before_request():
     g.user = current_user
+    g.start_time = time.time()
     if g.user.is_authenticated():
         g.user.last_seen = datetime.datetime.utcnow()
         db.session.add(g.user)
@@ -90,14 +92,17 @@ def logout():
 @app.route('/search/<string:query>', methods=['GET', 'POST'])
 @app.route('/search/<string:query>/page/<int:page>', methods=['GET', 'POST'])
 def index(page=1, query=None):
+    start_time = time.time()
     articles = None
     if request.method == 'POST':
         return redirect(url_for('index', query=request.form['query']))
     if query is not None:
         print "running query"
-        articles = Article.simple_search(query).paginate(
-            page, ARTICLES_PER_PAGE, False)
+        articles = Article.simple_search(query)
+        print articles
+        articles=articles.paginate(page, ARTICLES_PER_PAGE, False)
 
+        flash("Query time: %f s" % (time.time()-g.start_time))
         print "query finished"
         return render_template('index.html', user=g.user, articles=articles)
     if g.user is not None and not g.user.is_anonymous():
@@ -108,6 +113,7 @@ def index(page=1, query=None):
         if not subscribed:
             print "Not subscribed"
             articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
+    flash("Query time: %f s" % (time.time()-g.start_time))
 
     return render_template('index.html', user=g.user, articles=articles)
 

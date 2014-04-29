@@ -146,9 +146,14 @@ class Feed(db.Model):
         return conditions
 
     def feed_articles(self):
-        conditions = self.feed_conditions()
-        q = Article.query.filter(or_(*conditions)).order_by(Article.created.desc())
-        return q
+        #conditions = self.feed_conditions()
+        #q = Article.query.filter(or_(*conditions)).order_by(Article.created.desc())
+        search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
+        q = Article.query.filter(Article.search_vector.match_tsquery(search_query))
+        for a in self.authors:
+            q = q.union(Article.query.filter(Article.authors.any(Author.id == a.id)))
+
+        return q.order_by(Article.created.desc())
 
 
 class Subscription(db.Model):
@@ -236,12 +241,15 @@ class Article(db.Model):
 
     categories = db.relationship('Category', secondary=articlescategories,
                                  backref=db.backref('articles', lazy='dynamic'))
+
     @staticmethod
     def simple_search(query):
-        return Article.query.filter(
-            or_(Article.search_vector.match_tsquery(parse_search_query(query)),
-                Article.authors.any(Author.lastname.ilike(query))
-            )).order_by(Article.created.desc())
+        q1 = Article.query.filter(Article.search_vector.match_tsquery(parse_search_query(query)))
+        q2 = Article.query.filter(Article.authors.any(Author.lastname.ilike(query)))
+
+        q = q1.union(q2)
+
+        return q.order_by(Article.created.desc())
 
 
     def __repr__(self):
