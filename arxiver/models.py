@@ -10,6 +10,9 @@ from sqlalchemy import or_, and_, func
 from flask.ext.sqlalchemy import BaseQuery
 from sqlalchemy_searchable import search, make_searchable, parse_search_query
 from sqlalchemy_utils.types import TSVectorType
+from sqlalchemy.sql import select
+from sqlalchemy.sql.expression import cast
+from sqlalchemy.types import Interval
 
 import datetime
 
@@ -21,29 +24,29 @@ EFREQ_WEEKLY = 1
 EFREQ_MONTHLY = 2
 
 feedkeywords = db.Table('feedkeywords',
-                        db.Column('feed_id', db.Integer, db.ForeignKey('feed.id')),
-                        db.Column('keyword_id', db.Integer, db.ForeignKey('keyword.id'))
+                        db.Column('feed_id', db.Integer, db.ForeignKey('feed.id'), index=True),
+                        db.Column('keyword_id', db.Integer, db.ForeignKey('keyword.id'), index=True)
 )
 
 feedauthors = db.Table('feedauthors',
-                       db.Column('feed_id', db.Integer, db.ForeignKey('feed.id')),
-                       db.Column('author_id', db.Integer, db.ForeignKey('author.id'))
+                       db.Column('feed_id', db.Integer, db.ForeignKey('feed.id'), index=True),
+                       db.Column('author_id', db.Integer, db.ForeignKey('author.id'), index=True)
 )
 
 feedcategories = db.Table('feedcategories',
-                          db.Column('feed_id', db.Integer, db.ForeignKey('feed.id')),
-                          db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
+                          db.Column('feed_id', db.Integer, db.ForeignKey('feed.id'), index=True),
+                          db.Column('category_id', db.Integer, db.ForeignKey('category.id'), index=True)
 )
 
 articlescategories = db.Table('articlescategories'
                               '',
-                              db.Column('article_id', db.Integer, db.ForeignKey('article.id')),
-                              db.Column('category_id', db.Integer, db.ForeignKey('category.id'))
+                              db.Column('article_id', db.Integer, db.ForeignKey('article.id'), index=True),
+                              db.Column('category_id', db.Integer, db.ForeignKey('category.id'), index=True)
 )
 
 articlelikes = db.Table('articlelikes',
-                        db.Column('article_id', db.Integer, db.ForeignKey('article.id')),
-                        db.Column('user_id', db.Integer, db.ForeignKey('user.id'))
+                        db.Column('article_id', db.Integer, db.ForeignKey('article.id'), index=True),
+                        db.Column('user_id', db.Integer, db.ForeignKey('user.id'), index=True)
 )
 
 make_searchable()
@@ -121,7 +124,7 @@ class Feed(db.Model):
     name = db.Column(db.String(120), index=True)
     public = db.Column(db.Boolean, default=True)
     timestamp = db.Column(db.DateTime)
-    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)
 
     authors = db.relationship('Author', secondary=feedauthors,
                               backref=db.backref('authors', lazy='dynamic'))
@@ -134,26 +137,19 @@ class Feed(db.Model):
 
     subscriptions = db.relationship('Subscription', backref=db.backref('feed'), lazy='dynamic')
 
-    def feed_conditions(self):
-        conditions = []
-        for a in self.authors:
-            conditions.append(Article.authors.any(Author.id == a.id))
-        query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
-        conditions.append(Article.search_vector.match_tsquery(query))
-        # for kw in self.keywords:
-        #     conditions.append(Article.title.ilike('%' + kw.keyword + '%'))
-        #     conditions.append(Article.abstract.ilike('%' + kw.keyword + '%'))
-        return conditions
 
     def feed_articles(self):
-        #conditions = self.feed_conditions()
-        #q = Article.query.filter(or_(*conditions)).order_by(Article.created.desc())
-        search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
-        q = Article.query.filter(Article.search_vector.match_tsquery(search_query))
-        for a in self.authors:
-            q = q.union(Article.query.filter(Article.authors.any(Author.id == a.id)))
 
-        return q.order_by(Article.created.desc())
+        #explain (analyze,buffers) select * from article INNER JOIN (select id from article as blah where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select article_id from articlesauthors as blah where author_id in (54962, 55738, 85464, 85465, 125598, 55921)) on id=blah order by created desc;
+        #select * from (select distinct on (id) * from (select articles.* from articles where search_vector @@ ... union all select a.* from articles a join articlesauthors aa on ... where author_id = any (...)) s1) s2 order by created_at desc;
+        #explain (analyze,buffers) select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
+        #select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
+        search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
+        alist = [a.id for a in self.authors]
+        s1 = select([ArticleAuthor.article_id]).where(ArticleAuthor.author_id.in_(alist))
+        s2 = select([Article.id]).where(Article.search_vector.match_tsquery(search_query))
+        q = Article.query.filter(Article.id.in_(s1.union(s2))).order_by((Article.created+cast("0", Interval)).desc()) #The addition of the extra interval is important because it changes the way the query plan is computed and makes it run 100x faster!
+        return q
 
 
 class Subscription(db.Model):
@@ -161,8 +157,8 @@ class Subscription(db.Model):
     enable_email = db.Column(db.Boolean, default=False)
     email_frequency = db.Column(db.Integer, default=EFREQ_DAILY)
 
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    feed_id = db.Column(db.Integer, db.ForeignKey('feed.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)
+    feed_id = db.Column(db.Integer, db.ForeignKey('feed.id'), index=True)
 
     # def __init__(self, id=None, subscriber=None, feed=None, enable_email=None,email_frequency=None):
     #     self.feed = feed
@@ -198,8 +194,8 @@ class Author(db.Model):
 class ArticleAuthor(db.Model):
     __tablename__ = 'articlesauthors'
 
-    article_id = db.Column(db.Integer, db.ForeignKey('article.id'), primary_key=True)
-    author_id = db.Column(db.Integer, db.ForeignKey('author.id'), primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey('article.id'), primary_key=True, index=True)
+    author_id = db.Column(db.Integer, db.ForeignKey('author.id'), primary_key=True, index=True)
     position = db.Column(db.Integer)
 
     def __init__(self, author):
@@ -217,14 +213,14 @@ class Article(db.Model):
     arxiv_id = db.Column(db.String(64), index=True, unique=True)
     title = db.Column(db.String(), index=True)
     abstract = db.Column(db.String(), index=True)
-    comments = db.Column(db.String())
+    comments = db.Column(db.String(), index=True)
     created = db.Column(db.Date(), index=True)
     updated = db.Column(db.Date(), index=True)
     doi = db.Column(db.String(), index=True)
     journalref = db.Column(db.String(), index=True)
     mscclass = db.Column(db.String(), index=True)
     acmclass = db.Column(db.String(), index=True)
-    license = db.Column(db.String())
+    license = db.Column(db.String(), index=True)
 
     title_search_vector = db.Column(TSVectorType('title'))
     abstract_search_vector = db.Column(TSVectorType('abstract'))
@@ -246,10 +242,11 @@ class Article(db.Model):
     def simple_search(query):
         q1 = Article.query.filter(Article.search_vector.match_tsquery(parse_search_query(query)))
         q2 = Article.query.filter(Article.authors.any(Author.lastname.ilike(query)))
+        #q2 = Article.query.filter(Article.authors.any(func.lower(Author.lastname) == func.lower(query)))
 
         q = q1.union(q2)
 
-        return q.order_by(Article.created.desc())
+        return q.order_by((Article.created+cast("0",Interval)).desc())
 
 
     def __repr__(self):
@@ -266,7 +263,7 @@ class Keyword(db.Model):
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True)
+    name = db.Column(db.String(120), unique=True, index=True)
 
     def __repr__(self):
         return self.name
