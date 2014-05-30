@@ -1,7 +1,8 @@
 __author__ = 'dave'
 
 from flask.ext.wtf import Form
-from wtforms import TextField, TextAreaField, BooleanField, SelectMultipleField, FieldList, SelectField
+from wtforms import TextField, TextAreaField, BooleanField, SelectMultipleField, FieldList, SelectField, HiddenField, \
+    widgets
 from wtforms.validators import Required, Length
 from wtforms.ext.sqlalchemy.orm import model_form
 
@@ -36,6 +37,36 @@ class EditUserForm(Form):
         return True
 
 
+class MultiCheckboxField(SelectMultipleField):
+    """
+    A multiple-select, except displays a list of checkboxes.
+
+    Iterating the field will produce subfields, allowing custom rendering of
+    the enclosed checkbox fields.
+    """
+    widget = widgets.ListWidget(prefix_label=False)
+    option_widget = widgets.CheckboxInput()
+
+
+class AuthorForm(Form):
+    feeds = MultiCheckboxField(coerce=int)
+    similar_authors = MultiCheckboxField(coerce=int)
+
+    def author_id_articles(self, id):
+        query = Author.author_id_articles(id).limit(5)
+        return query
+
+    def __init__(self, user=None, author=None, feed_id=None, *args, **kwargs):
+        Form.__init__(self, *args, **kwargs)
+
+        self.feeds.choices = [(f.id, f.name ) for f in user.feeds]
+        if feed_id is not None:
+            self.feeds.data = [feed_id]
+
+        self.similar_authors.choices = [(a.id, str(a)) for a in author.similar_authors()]
+        self.similar_authors.choices.insert(0, (author.id, str(author)))
+
+
 class SearchForm(Form):
     title = TextField('title')
     author = TextField('author')
@@ -52,55 +83,25 @@ class SimpleSearchForm(Form):
     query = TextField('query')
 
 
-#learned from https://gist.github.com/kageurufu/6813878
+# learned from https://gist.github.com/kageurufu/6813878
 class FeedForm(Form):
     name = TextField('Name')
     public = BooleanField('Public')
     enable_email = BooleanField('Email subscribe')
-    email_frequency = SelectField('Frequency', choices=( ('0', 'Daily'), ('1', 'Weekly'), ('2', 'Monthly')))
-    authors = FieldList(TextField('Author'), min_entries=1)
-    keywords = FieldList(TextField('Keyword'), min_entries=1)
+    email_frequency = SelectField('Frequency', choices=( (0, 'Daily'), (1, 'Weekly'), (2, 'Monthly')), coerce=int)
 
     def populate_obj(self, obj):
-        authors = []
-        for author_id in self.authors.data:
-            try:
-                aid = int(author_id)
-                a = Author.query.filter(Author.id == aid).first()
-            except:
-                a = None
-            if a is not None:
-                authors.append(a)
-        #print "authors: " , authors
-
-        kws = []
-        for k in self.keywords.data:
-            if k != '':
-                kw = Keyword.query.filter(Keyword.keyword.ilike(k)).first()
-                if kw is None:
-                    kw = Keyword(keyword=k)
-                    print kw.keyword
-                    db.session.add(kw)
-                    #db.session.commit()
-                kws.append(kw)
-
         obj.public = self.public.data
         obj.name = self.name.data
         obj.timestamp = datetime.datetime.utcnow()
-        obj.authors = authors
-        obj.keywords = kws
         return obj
 
-
-    def init_form(self, obj):
-        self.name.data = obj.name
-        self.public.data = obj.public
-        self.enable_email.data = obj.enable_email
-        self.email_frequency.data = obj.email_frequency
-        for author in obj.authors:
-            self.authors.append(str(author.id))
-        for keyword in obj.keywords:
-            self.keywords.append_entry(keyword.keyword)
+    def __init__(self, *args, **kwargs):
+        Form.__init__(self, *args, **kwargs)
+        self.subscription = kwargs['subscription']
+        if self.subscription is not None:
+            self.enable_email.data = self.subscription.enable_email
+            self.email_frequency.data = self.subscription.email_frequency
 
 
 class EditForm(Form):

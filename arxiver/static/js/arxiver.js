@@ -25,19 +25,19 @@ function addField(event) {
     var fieldname = dyntable.data('name');
     var numinputs = dyntable.find('.removable-field-row').length;
     var field = $(
-        '<tr class="removable-field-row">\n' +
-            '<td><input id="' + fieldname + '-' + numinputs + '" name="' + fieldname + '-' + numinputs + '" type="text" class="removable-field-input" value=""></td>\n' +
+            '<tr class="removable-field-row">\n' +
+            '<td><input id="' + fieldname + '-' + numinputs + '" name="' + fieldname + '-' + numinputs + '" type="text" class="removable-field-input typeahead" value=""></td>\n' +
             '<td><button type="button" class="removable-field-button">&times;</button></td>\n</tr>'
     );
     console.log(numinputs)
     event.preventDefault();
     $(this).closest('tr').before(field);
+    bindTypeAhead();
 
 }
 
-$(document).ready(function () {
-    //Bind Index events
-    $('.typeahead').typeahead({
+function bindTypeAhead() {
+    $('.author-typeahead').typeahead({
         hint: true,
         highlight: true,
         minLength: 1
@@ -53,17 +53,153 @@ $(document).ready(function () {
             });
         }
     });
+}
 
-    //Bind FeedForm events
-    $('.DynamicTextFieldList').on('click', '.removable-field-button', removeField)
-        .on('click', '.addable-field-button', addField)
-    console.log($('email_frequency').attr('checked'))
-    if ($('#email_frequency').attr('checked')) {
+
+function bindKeywordTypeAhead() {
+    $('.keyword-typeahead').typeahead({
+        hint: true,
+        highlight: true,
+        minLength: 1
+    }, {
+        name: 'keyword',
+        displayKey: function (keyword) {
+            return keyword.keyword;
+        },
+        source: function (query, process) {
+            console.log('typeahead');
+            return $.get('/autocomplete/keyword/' + query, function (data) {
+                process(data.keywords);
+            });
+        }
+    });
+}
+
+function setupEditFeed() {
+    $('a[data-remove-author]').click(function (event) {
+        //$(this).hide();
+        $(this).closest('span').hide();
+        $.ajax({
+            type: 'POST',
+            url: '/delete_feed_author',
+            data: JSON.stringify({author_id: $(this).attr('data-author_id'), feed_id: $(this).attr('data-feed_id')}),
+            dataType: 'json',
+            contentType: "application/json; charset=utf-8",
+
+            complete: function () {
+                //window.location.reload(); //reload the page on submit
+            }
+
+        });
+        //event.preventDefault();
+    });
+
+    $('a[data-remove-keyword]').click(function (event) {
+        //$(this).hide();
+        $(this).closest('span').hide();
+        $.ajax({
+            type: 'POST',
+            url: '/delete_feed_keyword',
+            data: JSON.stringify({keyword: $(this).attr('data-keyword'), feed_id: $(this).attr('data-feed_id') }),
+            dataType: 'json',
+            contentType: "application/json; charset=utf-8",
+
+            complete: function () {
+                //window.location.reload(); //reload the page on submit
+            }
+
+        });
+        //event.preventDefault();
+    });
+
+    $('a[data-add-keyword]').click(function (event) {
+        var s = $($(this).attr('data-text')).val();
+        $.ajax({
+            type: 'POST',
+            url: '/add_feed_keyword',
+            data: JSON.stringify({keyword: s, feed_id: $(this).attr('data-feed_id') }),
+            dataType: 'json',
+            contentType: "application/json; charset=utf-8",
+
+            complete: function () {
+                console.log('success!')
+                //window.location.reload(); //reload the page on submit
+            }
+
+        });
+        //event.preventDefault();
+    });
+
+    $('#openBtn').click(function () {
+        var s = $($(this).attr('data-text')).val();
+        console.log(s);
+        $('#myModalLabel').html('Edit: ' + s + ' feed status');
+        $('.modal-body').load('/add_feed_author', {'query': s, 'feed_id': $(this).attr('data-feed_id'), 'endpoint': $(this).attr('href')}, function (result) {
+            console.log(result)
+
+            $('#myModal').modal();
+        });
+        event.preventDefault();
+
+    });
+
+    if ($('#enable_email').attr('checked')) {
         $('#email_frequency').show();
     }
     $('#enable_email').on('change', function () {
         $('#email_frequency').fadeToggle();
     });
 
+}
+
+function setupAuthor() {
+    $('#followAuthorBtn').click(function () {
+        $('#myModalLabel').html('Follow/Unfollow: ' + $(this).attr('data-author-names') + ' feed status');
+        $('.modal-body').load('/add_feed_author', {'author_id': $(this).attr('data-author-id'), 'endpoint': $(this).attr('href')}, function (result) {
+            //console.log(result)
+            $('#myModal').modal();
+        });
+        event.preventDefault();
+
+    });
+}
+
+$(document).ready(function () {
+    //Bind Index events
+    bindTypeAhead();
+
+    //Bind FeedForm events
+//    $('.DynamicTextFieldList').on('click', '.removable-field-button', removeField)
+//        .on('click', '.addable-field-button', addField)
+//    console.log($('email_frequency').attr('checked'))
+
+    $('form[data-async]').on('submit', function (event) {
+        var $form = $(this);
+        //var $target = $($form.attr('data-target'));
+
+        $.ajax({
+            type: $form.attr('method'),
+            url: $form.attr('action'),
+            data: $form.serialize(),
+
+            success: function () {
+            },
+
+            complete: function () {
+                window.location.replace($form.attr('data-next'));
+            }
+        });
+
+        event.preventDefault();
+    });
+
+    $('.slideDownCtl').click(function () {
+        $($(this).attr('data-target')).slideToggle();
+        event.preventDefault();
+    });
+
+    setupEditFeed();
+    setupAuthor();
+    bindKeywordTypeAhead();
 
 });

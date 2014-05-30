@@ -52,6 +52,5 @@ if not app.debug:
 
     app.logger.addHandler(file_handler)
     app.logger.info(__name__ + ' startup')
-
 from arxiver import views, models  #, apis
 

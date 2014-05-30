@@ -1,0 +1,7 @@
+    <ul class="nav nav-list">
+        <li class="nav-header">Subscriptions: </li>
+        {% for s in user.subscriptions %}
+            <li><a href="{{ url_for("feed",id=s.feed.id) }}">{{ s.feed.name }}</a></li>
+        {% endfor %}
+    <li><a href="{{ url_for('feed',id=None) }}" class="btn btn-info"><i class="glyphicon glyphicon-plus"></i></a></li>
+    </ul>

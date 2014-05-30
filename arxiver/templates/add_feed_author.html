@@ -1,0 +1,52 @@
+{% from "macros.html" import render_article,render_articles,render_pagination, render_citations %}
+
+
+{% macro render_titles(articles) %}
+    {% if articles != None %}
+        <ul>
+            {% for article in articles %}
+                <li>{{ article.title }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        No articles!
+    {% endif %}
+{% endmacro %}
+
+<form class="form-horizontal well" data-async data-next="{{ endpoint }}"
+      action="{{ url_for('add_author',author_id=author.id) }}"
+      method="POST">
+    <fieldset>
+        {{ author_form.hidden_tag() }}
+        <!-- form content -->
+
+        <h4>Feeds</h4>
+
+        {% for feed in author_form.feeds %}
+            {{ feed }}
+            {{ feed.label }}
+        {% endfor %}
+
+
+        <h4>Author Names</h4>
+        {% for sa in author_form.similar_authors %}
+            <a href="#" role="button" class="btn btn-default btn-toggle btn-sm"
+               data-previewid="{{ sa.data }}">
+                {{ sa }} {{ sa.label.text }}
+            </a>
+        {% endfor %}
+        <br/>
+        <input type="submit" class="btn btn-primary" value="submit">
+
+        <hr>
+        {% for sa in author_form.similar_authors %}
+            <div class="preview" data-previewid="{{ sa.data }}" style="display:none;">
+                <h4>{{ sa.label.text }}: Recent titles</h4>
+                {{ render_titles(author_form.author_id_articles(sa.data)) }}
+            </div>
+        {% endfor %}
+
+    </fieldset>
+</form>
+
+<script src="{{ url_for("static", filename="js/add_author.js") }}"></script>

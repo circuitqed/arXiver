@@ -184,6 +184,23 @@ class Author(db.Model):
     def similar_authors(self):
         return Author.query.filter(Author.lastname.ilike(self.lastname),
                                    Author.forenames.ilike(self.forenames[0] + '%'), Author.id != self.id)
+    @staticmethod
+    def author_id_articles(id):
+        return Article.query.filter(Article.authors.any(Author.id == id)).order_by(Article.created.desc())
+
+    def author_articles(self):
+        return Author.author_id_articles(self.id)
+
+    @staticmethod
+    def auto_complete_authors(search_term):
+        names = search_term.split(' ')
+        conditions = []
+        conditions.append(Author.lastname.ilike(names[-1] + '%'))
+        if len(names) > 1:
+            conditions.append(Author.forenames.ilike(search_term[0] + '%'))
+        similar_authors = Author.query.filter(and_(*conditions)).with_entities(Author.id, Author.forenames,
+                                                                                         Author.lastname)
+        return similar_authors
 
 
     def __repr__(self):
@@ -256,6 +273,11 @@ class Article(db.Model):
 class Keyword(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     keyword = db.Column(db.String(120), index=True, unique=True)
+
+
+    @staticmethod
+    def auto_complete_keyword(search_term):
+        return Keyword.query.filter(Keyword.keyword.ilike(search_term)+'%')
 
     def __repr__(self):
         return self.keyword

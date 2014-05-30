@@ -28,6 +28,21 @@
     </div>
 {% endmacro %}
 
+{% macro render_citations(articles) %}
+    {% if articles != None %}
+        {% for article in articles %}
+            {{ article.title }}
+            {% for a in article.authors %}
+                {{ a.forenames }} {{ a.lastname }}
+                {% if not loop.last %},
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    {% else %}
+        No articles!
+    {% endif %}
+{% endmacro %}
+
 {% macro render_articles(articles,endpoint) %}
     <div class="articles_preview">
         {% if articles != None %}
@@ -40,7 +55,8 @@
                                 <a data-toggle="collapse" data-parent="#accordion"
                                    href="#article-collapse-{{ article.id }}"> {{ article.title }} </a>
                                 <br/>
-                                <a href="http://arxiv.org/pdf/{{ article.arxiv_id }}"><i class="glyphicon glyphicon-file" style="color:#ff3a47"></i></a>
+                                <a href="http://arxiv.org/pdf/{{ article.arxiv_id }}"><i
+                                        class="glyphicon glyphicon-file" style="color:#ff3a47"></i></a>
                                 {% for a in article.authors %}
                                     <a href="{{ url_for('author', id=a.id) }}">{{ a.forenames }} {{ a.lastname }}</a>
                                     {% if not loop.last %},
@@ -53,10 +69,22 @@
                                 <p>{{ article.abstract }}</p>
 
                                 <p>{{ article.comments }}</p>
-                                <a href="http://arxiv.org/{{ article.arxiv_id }}">{{ article.arxiv_id }}</a> - <a href="http://dx.doi.org/{{ article.doi }}">{{ article.doi }}</a>
-                                <span>{{ article.journalref }}</span> <br/>
+                                <a href="http://arxiv.org/{{ article.arxiv_id }}">arXiv:{{ article.arxiv_id }}</a>
+                                {% if article.journalref or article.doi %}
+                                    -
+                                {% endif %}
+                                {% if article.doi %}
+                                    <a
+                                            href="http://dx.doi.org/{{ article.doi }}">{{ article.doi }}</a>
+                                {% endif %}
+                                {% if article.journalref %}
+                                    <span>{{ article.journalref }}</span>
+                                {% endif %}
+                                <br/>
                                 <span>Created: {{ article.created }}</span>
-                                <span>Updated: {{ article.updated }}</span>
+                                {% if article.updated %}
+                                    <span>Updated: {{ article.updated }}</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

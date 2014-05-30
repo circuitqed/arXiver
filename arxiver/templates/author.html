@@ -1,17 +1,26 @@
 {% extends "base.html" %}
+
 {% block header %}
+    <a id="followAuthorBtn" href="{{ url_for('author', id=author.id) }}" class="btn btn-primary btn-lg"
+       data-author-names="{{ author.forenames }} {{ author.lastname }}" data-author-id="{{ author.id }}"
+       style="float:right">
+        Follow
+    </a>
+
     <h2>Author: {{ author.forenames }} {{ author.lastname }}</h2>
+    <!-- Button trigger modal -->
 {% endblock %}
 
 {% block nav_content %}
-  <ul class="nav nav-list">
+    <ul class="nav nav-list">
         <li class="nav-header">Similar Names</li>
         {% for sa in similar_authors %}
             <li><a href="{{ url_for('author', id=sa.id) }}">{{ sa.forenames }} {{ sa.lastname }}</a></li>
         {% endfor %}
         <li class="nav-header">Collaborators</li>
-         {% for c in collaborators %}
-            <li><a href="{{ url_for('author', id=c[0].id) }}">{{ c[0].forenames }} {{ c[0].lastname }} ({{ c[1] }})</a></li>
+        {% for c in collaborators %}
+            <li><a href="{{ url_for('author', id=c[0].id) }}">{{ c[0].forenames }} {{ c[0].lastname }} ({{ c[1] }})</a>
+            </li>
         {% endfor %}
 
     </ul>
@@ -20,6 +29,25 @@
 {% block content %}
 
     {{ render_articles(articles,'author') }}
+
+    <!-- Modal -->
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                    <h3 class="modal-title" id="myModalLabel">Edit: {{ author }} feed status</h3>
+                </div>
+                <div class="modal-body">
+                </div>
+                <div class="modal-footer">
+                    <span id="status"></span>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
 {% endblock %}
 
