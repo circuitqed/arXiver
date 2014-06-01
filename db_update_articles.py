@@ -1,10 +1,10 @@
-#!/usr/local/bin/python
+# !/usr/local/bin/python
 
 __author__ = 'dave'
 
 from sickle import Sickle
 import datetime, dateutil
-from arxiver.models import Article, Author, Category
+from arxiver.models import Article, Author, Category, Synchronization
 from arxiver import db
 
 
@@ -54,10 +54,15 @@ def add_article(metadata):
             category = add_category(catname)
             a.categories.append(category)
 
+    a_str = u""
     for fname, lname in zip(metadata['forenames'], metadata['keyname']):
         author = add_author(fname, lname)
+        a_str += author.__repr__() + ' '
         if author not in a.authors:
             a.authors.append(author)
+
+    a.full_description = metadata['title'][0] + '\n' + a_str[:-1] + '\n' + metadata['abstract'][0] + '\n' + \
+                         metadata['id'][0] + '\n' + metadata['categories'][0]
 
     db.session.add(a)
     return a
@@ -67,10 +72,16 @@ if __name__ == '__main__':
 
     arxiv = Sickle('http://export.arxiv.org/oai2')
 
-    date = datetime.date(2014, 2, 14)
+#    date = datetime.date(2014, 5, 14)
+#    records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
 
-    #records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
-    records = arxiv.ListRecords(metadataPrefix= 'arXiv')
+    last_update = Synchronization.query.order_by(Synchronization.id.desc()).first()
+    if last_update is not None:
+        date = last_update.date
+        records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
+    else:
+        date = None
+        records = arxiv.ListRecords(metadataPrefix='arXiv')
 
     count = 0
     badrecords = []
@@ -82,5 +93,7 @@ if __name__ == '__main__':
         except Exception as e:
             badrecords.append(r)
             print "Exception: ", e
-        #print a.title
+        # print a.title
         db.session.commit()
+    db.session.add(Synchronization(date=datetime.datetime.now()))
+    db.session.commit()

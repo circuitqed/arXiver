@@ -17,6 +17,7 @@ $('.btn-toggle').hover(
 
 $('form[data-async]').on('submit', function (event) {
     var $form = $(this);
+    var myURL = $form.attr('data-next');
     //var $target = $($form.attr('data-target'));
 
     $.ajax({
@@ -28,7 +29,7 @@ $('form[data-async]').on('submit', function (event) {
         },
 
         complete: function () {
-            window.location.replace($form.attr('data-next'));
+            window.location.replace(myURL);
         }
     });
 

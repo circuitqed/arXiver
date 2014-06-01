@@ -70,6 +70,9 @@ def as_dict(m):
             d[c.name] = str(d[c.name])
     return d
 
+class Synchronization(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.DateTime(), index=True)
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -229,7 +232,8 @@ class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     arxiv_id = db.Column(db.String(64), index=True, unique=True)
     title = db.Column(db.String(), index=True)
-    abstract = db.Column(db.String(), index=True)
+    abstract = db.Column(db.String())
+    full_description = db.Column(db.String())
     comments = db.Column(db.String(), index=True)
     created = db.Column(db.Date(), index=True)
     updated = db.Column(db.Date(), index=True)
@@ -241,8 +245,8 @@ class Article(db.Model):
 
     title_search_vector = db.Column(TSVectorType('title'))
     abstract_search_vector = db.Column(TSVectorType('abstract'))
-    search_vector = db.Column(TSVectorType('title', 'abstract'))
-
+    title_abstract_search_vector = db.Column(TSVectorType('title','abstract'))
+    search_vector = db.Column(TSVectorType('full_description'))
 
     #These set up the ordered list of authors
     associations = db.relationship('ArticleAuthor',
@@ -258,12 +262,12 @@ class Article(db.Model):
     @staticmethod
     def simple_search(query):
         q1 = Article.query.filter(Article.search_vector.match_tsquery(parse_search_query(query)))
-        q2 = Article.query.filter(Article.authors.any(Author.lastname.ilike(query)))
+        #q2 = Article.query.filter(Article.authors.any(Author.lastname.ilike(query)))
         #q2 = Article.query.filter(Article.authors.any(func.lower(Author.lastname) == func.lower(query)))
 
-        q = q1.union(q2)
+        #q = q1.union(q2)
 
-        return q.order_by((Article.created+cast("0",Interval)).desc())
+        return q1.order_by((Article.created+cast("0",Interval)).desc())
 
 
     def __repr__(self):

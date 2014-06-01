@@ -10,11 +10,19 @@ from config import basedir
 from config import ARTICLES_PER_PAGE
 from config import ADMINS, MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
 from flask.ext.restful import Api
+from flask.ext.script import Manager
+from flask.ext.migrate import Migrate, MigrateCommand
+
 
 app = Flask(__name__, static_url_path='')
 app.config.from_object('config')
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 api = Api(app)
+
+manager = Manager(app)
+manager.add_command('db', MigrateCommand)
+
 
 lm = LoginManager()
 lm.init_app(app)
