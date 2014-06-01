@@ -77,6 +77,9 @@ function bindKeywordTypeAhead() {
 
 function setupEditFeed() {
     $('a[data-remove-author]').click(function (event) {
+        event.preventDefault();
+        var myURL=$(this).attr('href');
+
         //$(this).hide();
         $(this).closest('span').hide();
         $.ajax({
@@ -88,14 +91,16 @@ function setupEditFeed() {
 
             complete: function () {
                 //window.location.reload(); //reload the page on submit
+                window.location.href = myURL;
             }
 
         });
-        //event.preventDefault();
     });
 
     $('a[data-remove-keyword]').click(function (event) {
         //$(this).hide();
+        event.preventDefault();
+        var myURL=$(this).attr('href');
         $(this).closest('span').hide();
         $.ajax({
             type: 'POST',
@@ -106,14 +111,18 @@ function setupEditFeed() {
 
             complete: function () {
                 //window.location.reload(); //reload the page on submit
+                window.location.href = myURL;
             }
 
         });
-        //event.preventDefault();
+
     });
 
     $('a[data-add-keyword]').click(function (event) {
+        event.preventDefault();
+        var myURL=$(this).attr('href');
         var s = $($(this).attr('data-text')).val();
+        console.log(myURL);
         $.ajax({
             type: 'POST',
             url: '/add_feed_keyword',
@@ -122,12 +131,13 @@ function setupEditFeed() {
             contentType: "application/json; charset=utf-8",
 
             complete: function () {
-                console.log('success!')
+                //console.log(s)
                 //window.location.reload(); //reload the page on submit
+                window.location.href = myURL;
             }
 
         });
-        //event.preventDefault();
+
     });
 
     $('#openBtn').click(function () {

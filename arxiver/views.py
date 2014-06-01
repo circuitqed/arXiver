@@ -227,14 +227,22 @@ def feed(id=None, page=1):
         edit = True
     else:
         edit = False
+
     if id is None:
-        f = None
+        f = Feed(name='New Feed')
+        g.user.feeds.append(f)
+        s = Subscription(subscriber=g.user, feed=f)
+        db.session.add(f)
+        db.session.add(s)
+        db.session.commit()
+
         edit = True
     else:
         f = Feed.query.filter(Feed.id == id).first()
+        s = Subscription.query.filter(and_(Subscription.feed_id == id, Subscription.user_id == g.user.id)).first()
 
-    s = Subscription.query.filter(and_(Subscription.feed_id == id, Subscription.user_id == g.user.id)).first()
     form = FeedForm(request.form, f, subscription=s)
+
 
     if form.validate_on_submit():
         edit = True
@@ -248,11 +256,6 @@ def feed(id=None, page=1):
                 return redirect(url_for('index'))
 
         print 'validated'
-        if f is None:
-            f = Feed()
-            g.user.feeds.append(f)
-        if s is None:
-            s = Subscription(subscriber=g.user, feed=f)
 
         f = form.populate_obj(f)
         s.enable_email = form.enable_email.data
