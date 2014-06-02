@@ -74,10 +74,10 @@ if __name__ == '__main__':
 
 #    date = datetime.date(2014, 5, 14)
 #    records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
-
+#    print str(datetime.date(2014, 5, 14))
     last_update = Synchronization.query.order_by(Synchronization.id.desc()).first()
     if last_update is not None:
-        date = last_update.date
+        date = last_update.date.date()
         records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
     else:
         date = None
