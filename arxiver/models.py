@@ -13,6 +13,7 @@ from sqlalchemy_utils.types import TSVectorType
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import cast
 from sqlalchemy.types import Interval
+from sqlalchemy.orm import deferred
 
 import datetime
 
@@ -243,10 +244,10 @@ class Article(db.Model):
     acmclass = db.Column(db.String(), index=True)
     license = db.Column(db.String(), index=True)
 
-    title_search_vector = db.Column(TSVectorType('title'))
-    abstract_search_vector = db.Column(TSVectorType('abstract'))
-    title_abstract_search_vector = db.Column(TSVectorType('title','abstract'))
-    search_vector = db.Column(TSVectorType('full_description'))
+    title_search_vector = deferred(db.Column(TSVectorType('title')))
+    abstract_search_vector = deferred(db.Column(TSVectorType('abstract')))
+    title_abstract_search_vector = deferred(db.Column(TSVectorType('title','abstract')))
+    search_vector = deferred(db.Column(TSVectorType('full_description')))
 
     #These set up the ordered list of authors
     associations = db.relationship('ArticleAuthor',
@@ -268,6 +269,7 @@ class Article(db.Model):
         #q = q1.union(q2)
 
         return q1.order_by((Article.created+cast("0",Interval)).desc())
+        #return q1.order_by(Article.created.desc())
 
 
     def __repr__(self):
