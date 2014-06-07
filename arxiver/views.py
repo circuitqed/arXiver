@@ -4,10 +4,12 @@ from datetime import datetime
 import time
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify
 from flask.ext.login import login_user, logout_user, current_user, login_required
-from arxiver import app, db, lm, oid, ARTICLES_PER_PAGE
+from arxiver import app, db, lm, googlelogin, ARTICLES_PER_PAGE  # ,oid
 from forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm, AuthorForm
 # from models import User, ROLE_USER, ROLE_ADMIN
 from models import *
+# from social.apps.flask_app.template_filters import backends
+# from social.apps.flask_app import routes
 
 
 @app.errorhandler(404)
@@ -37,58 +39,107 @@ def before_request():
         db.session.add(g.user)
         db.session.commit()
 
+
 @app.after_request
 def after_request(response):
     diff = int((time.time() - g.start_time) * 1000)  # to get a time in ms
 
-    if (response.response and response.content_type.startswith("text/html") and response.status_code==200):
+    if (response.response and response.content_type.startswith("text/html") and response.status_code == 200):
         response.response[0] = response.response[0].replace('__EXECUTION_TIME__', str(diff))
         response.headers["content-length"] = len(response.response[0])
     return response
 
 
-
-
-@app.route('/login', methods=['GET', 'POST'])
-@oid.loginhandler
-def login():
-    if g.user is not None and g.user.is_authenticated():
-        return redirect(url_for('index'))
-    form = LoginForm()
-    if form.validate_on_submit():
-        session['remember_me'] = form.remember_me.data
-        # flash('Login requested for OpenID="' + form.openid.data + '", remember_me=' + str(form.remember_me.data))
-
-        return oid.try_login(form.openid.data, ask_for=['nickname', 'email', 'image', 'fullname', 'website'])
-
-    return render_template('login.html',
-                           title='Sign In',
-                           form=form,
-                           providers=app.config['OPENID_PROVIDERS'])
-
-
-@oid.after_login
-def after_login(resp):
-    print resp.nickname, resp.email, resp.image, resp.fullname, resp.website
-    if resp.email is None or resp.email == '':
-        flash('Invalid login: email is missing! Please try again.')
-        return redirect(url_for('login'))
-
-    user = User.query.filter_by(email=resp.email).first()
-    if user is None:
-        nickname = resp.nickname
-        if nickname is None or nickname == '':
-            nickname = resp.email.split('@')[0]
-        nickname = User.make_unique_nickname(nickname)
-        user = User(nickname=nickname, email=resp.email, fullname=resp.fullname, role=ROLE_USER)
-        db.session.add(user)
+@app.teardown_appcontext
+def commit_on_success(error=None):
+    if error is None:
         db.session.commit()
+
+
+@app.teardown_request
+def shutdown_session(exception=None):
+    db.session.remove()
+
+
+@app.context_processor
+def inject_user():
+    try:
+        return {'user': g.user}
+    except AttributeError:
+        return {'user': None}
+
+
+# app.context_processor(backends)
+
+
+@app.route('/login2')
+def login2():
+    return render_template('login2.html', loginurl=googlelogin.login_url(redirect_uri=url_for('create_or_update_user',_external=True),
+                                                                         params={'next': url_for('index')}))
+
+
+# @app.route('/login', methods=['GET', 'POST'])
+# @oid.loginhandler
+# def login():
+# if g.user is not None and g.user.is_authenticated():
+#         return redirect(url_for('index'))
+#     form = LoginForm()
+#     if form.validate_on_submit():
+#         session['remember_me'] = form.remember_me.data
+#         # flash('Login requested for OpenID="' + form.openid.data + '", remember_me=' + str(form.remember_me.data))
+#
+#         return oid.try_login(form.openid.data, ask_for=['nickname', 'email', 'image', 'fullname', 'website'])
+#
+#     return render_template('login.html',
+#                            title='Sign In',
+#                            form=form,
+#                            providers=app.config['OPENID_PROVIDERS'])
+#
+#
+# @oid.after_login
+# def after_login(resp):
+#     print resp.nickname, resp.email, resp.image, resp.fullname, resp.website
+#     if resp.email is None or resp.email == '':
+#         flash('Invalid login: email is missing! Please try again.')
+#         return redirect(url_for('login'))
+#
+#     user = User.query.filter_by(email=resp.email).first()
+#     if user is None:
+#         nickname = resp.nickname
+#         if nickname is None or nickname == '':
+#             nickname = resp.email.split('@')[0]
+#         nickname = User.make_unique_nickname(nickname)
+#         user = User(nickname=nickname, email=resp.email, fullname=resp.fullname, role=ROLE_USER)
+#         db.session.add(user)
+#         db.session.commit()
+#     remember_me = False
+#     if 'remember_me' in session:
+#         remember_me = session['remember_me']
+#         session.pop('remember_me', None)
+#     if login_user(user, remember=remember_me):
+#         flash(user.nickname + ' logged in Successfully')
+#     return redirect(request.args.get('next') or url_for('index'))
+#
+
+@app.route('/oauth2callback')
+@googlelogin.oauth2callback
+def create_or_update_user(token, userinfo, **params):
+    user = User.query.filter_by(username=userinfo['id']).first()
+    if user:
+        user.fullname = userinfo['name']
+        user.avatar = userinfo['picture']
+    else:
+        user = User(username=userinfo['id'],
+                    fullname=userinfo['name'],
+                    avatar=userinfo['picture'])
+    db.session.add(user)
+    db.session.commit()
     remember_me = False
     if 'remember_me' in session:
         remember_me = session['remember_me']
         session.pop('remember_me', None)
     if login_user(user, remember=remember_me):
-        flash(user.nickname + ' logged in Successfully')
+        flash(user.fullname + ' logged in Successfully')
     return redirect(request.args.get('next') or url_for('index'))
 
 
@@ -253,7 +304,6 @@ def feed(id=None, page=1):
         s = Subscription.query.filter(and_(Subscription.feed_id == id, Subscription.user_id == g.user.id)).first()
 
     form = FeedForm(request.form, f, subscription=s)
-
 
     if form.validate_on_submit():
         edit = True

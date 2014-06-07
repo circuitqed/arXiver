@@ -6,7 +6,7 @@ from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy import or_, and_, func
 
-#fulltext imports from http://sqlalchemy-searchable.readthedocs.org/en/latest/
+# fulltext imports from http://sqlalchemy-searchable.readthedocs.org/en/latest/
 from flask.ext.sqlalchemy import BaseQuery
 from sqlalchemy_searchable import search, make_searchable, parse_search_query
 from sqlalchemy_utils.types import TSVectorType
@@ -14,6 +14,8 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import cast
 from sqlalchemy.types import Interval
 from sqlalchemy.orm import deferred
+from flask.ext.login import UserMixin
+# from social.apps.flask_app import models
 
 import datetime
 
@@ -71,15 +73,20 @@ def as_dict(m):
             d[c.name] = str(d[c.name])
     return d
 
+
 class Synchronization(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime(), index=True)
 
-class User(db.Model):
+
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     fullname = db.Column(db.String(), index=True)
+    username = db.Column(db.String(200), index=True)
     nickname = db.Column(db.String(64), unique=True, index=True)
+    password = db.Column(db.String(200))
     email = db.Column(db.String(), unique=True, index=True)
+    active = db.Column(db.Boolean, default=True)
     role = db.Column(db.Integer, default=ROLE_USER)
     last_seen = db.Column(db.DateTime())
     enable_email = db.Column(db.Boolean)
@@ -111,7 +118,7 @@ class User(db.Model):
         return True
 
     def is_active(self):
-        return True
+        return self.active
 
     def is_anonymous(self):
         return False
@@ -120,7 +127,7 @@ class User(db.Model):
         return unicode(self.id)
 
     def __repr__(self):
-        return '<User %r>' % (self.nickname)
+        return '<User %r>' % (self.username)
 
 
 class Feed(db.Model):
@@ -143,7 +150,6 @@ class Feed(db.Model):
 
 
     def feed_articles(self):
-
         #explain (analyze,buffers) select * from article INNER JOIN (select id from article as blah where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select article_id from articlesauthors as blah where author_id in (54962, 55738, 85464, 85465, 125598, 55921)) on id=blah order by created desc;
         #select * from (select distinct on (id) * from (select articles.* from articles where search_vector @@ ... union all select a.* from articles a join articlesauthors aa on ... where author_id = any (...)) s1) s2 order by created_at desc;
         #explain (analyze,buffers) select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
@@ -152,7 +158,8 @@ class Feed(db.Model):
         alist = [a.id for a in self.authors]
         s1 = select([ArticleAuthor.article_id]).where(ArticleAuthor.author_id.in_(alist))
         s2 = select([Article.id]).where(Article.search_vector.match_tsquery(search_query))
-        q = Article.query.filter(Article.id.in_(s1.union(s2))).order_by((Article.created+cast("0", Interval)).desc()) #The addition of the extra interval is important because it changes the way the query plan is computed and makes it run 100x faster!
+        q = Article.query.filter(Article.id.in_(s1.union(s2))).order_by((Article.created + cast("0",
+                                                                                                Interval)).desc())  #The addition of the extra interval is important because it changes the way the query plan is computed and makes it run 100x faster!
         return q
 
 
@@ -188,6 +195,7 @@ class Author(db.Model):
     def similar_authors(self):
         return Author.query.filter(Author.lastname.ilike(self.lastname),
                                    Author.forenames.ilike(self.forenames[0] + '%'), Author.id != self.id)
+
     @staticmethod
     def author_id_articles(id):
         return Article.query.filter(Article.authors.any(Author.id == id)).order_by(Article.created.desc())
@@ -203,7 +211,7 @@ class Author(db.Model):
         if len(names) > 1:
             conditions.append(Author.forenames.ilike(search_term[0] + '%'))
         similar_authors = Author.query.filter(and_(*conditions)).with_entities(Author.id, Author.forenames,
-                                                                                         Author.lastname)
+                                                                               Author.lastname)
         return similar_authors
 
 
@@ -246,7 +254,7 @@ class Article(db.Model):
 
     title_search_vector = deferred(db.Column(TSVectorType('title')))
     abstract_search_vector = deferred(db.Column(TSVectorType('abstract')))
-    title_abstract_search_vector = deferred(db.Column(TSVectorType('title','abstract')))
+    title_abstract_search_vector = deferred(db.Column(TSVectorType('title', 'abstract')))
     search_vector = deferred(db.Column(TSVectorType('full_description')))
 
     #These set up the ordered list of authors
@@ -268,7 +276,7 @@ class Article(db.Model):
 
         #q = q1.union(q2)
 
-        return q1.order_by((Article.created+cast("0",Interval)).desc())
+        return q1.order_by((Article.created + cast("0", Interval)).desc())
         #return q1.order_by(Article.created.desc())
 
 
@@ -283,7 +291,7 @@ class Keyword(db.Model):
 
     @staticmethod
     def auto_complete_keyword(search_term):
-        return Keyword.query.filter(Keyword.keyword.ilike(search_term)+'%')
+        return Keyword.query.filter(Keyword.keyword.ilike(search_term) + '%')
 
     def __repr__(self):
         return self.keyword

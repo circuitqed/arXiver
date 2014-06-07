@@ -9,25 +9,42 @@ from flask.ext.openid import OpenID
 from config import basedir
 from config import ARTICLES_PER_PAGE
 from config import ADMINS, MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
-from flask.ext.restful import Api
-from flask.ext.script import Manager
+#from flask.ext.restful import Api
+from flask.ext.script import Manager,Shell
 from flask.ext.migrate import Migrate, MigrateCommand
 
+# from social.apps.flask_app.routes import social_auth
+# from social.apps.flask_app.models import init_social
+
+from flask_googlelogin import GoogleLogin
 
 app = Flask(__name__, static_url_path='')
 app.config.from_object('config')
 db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-api = Api(app)
 
-manager = Manager(app)
-manager.add_command('db', MigrateCommand)
-
+#PSA login
+#app.register_blueprint(social_auth)
+#init_social(app,db)
 
 lm = LoginManager()
+lm.login_view = 'login2'
 lm.init_app(app)
-lm.login_view = 'login'
-oid = OpenID(app,os.path.join(basedir,'tmp'))
+googlelogin = GoogleLogin(app,lm)
+#oid = OpenID(app,os.path.join(basedir,'tmp'))
+
+
+#flask migrate
+migrate = Migrate(app, db)
+manager = Manager(app)
+manager.add_command('db', MigrateCommand)
+manager.add_command('shell', Shell(make_context=lambda: {
+    'app': app,
+    'db': db
+}))
+
+#api = Api(app)
+
+
 
 def url_for_other_page(page):
     args = request.view_args.copy()
