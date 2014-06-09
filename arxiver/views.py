@@ -230,16 +230,14 @@ def author(id, page=1):
 
     author_articles = author.author_articles().paginate(page, ARTICLES_PER_PAGE, False)
 
-    if g.user is not None:
-        author_form = AuthorForm(user=g.user, author=author)
-    else:
-        author_form = None
-
-    print author_form.feeds
+    # if g.user is not None and g.user.is_authenticated():
+    #     author_form = AuthorForm(user=g.user, author=author)
+    # else:
+    #     author_form = None
 
     return render_template('author.html', author=author, similar_authors=author.similar_authors().limit(10),
                            articles=author_articles,
-                           collaborators=author.collaborators().limit(10), author_form=author_form)
+                           collaborators=author.collaborators().limit(10))#, author_form=author_form)
 
 
 @app.route('/autocomplete/author/<search_term>')

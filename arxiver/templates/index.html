@@ -9,7 +9,5 @@
 {% endblock %}
 
 {% block nav_content %}
-    {% if g.user.is_authenticated() %}
-        {% include 'subscriptions.html' %}
-    {% endif %}
+    {% include 'subscriptions.html' %}
 {% endblock %}
