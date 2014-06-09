@@ -87,12 +87,12 @@ def login2():
 # form = LoginForm()
 # if form.validate_on_submit():
 # session['remember_me'] = form.remember_me.data
-#         # flash('Login requested for OpenID="' + form.openid.data + '", remember_me=' + str(form.remember_me.data))
+# # flash('Login requested for OpenID="' + form.openid.data + '", remember_me=' + str(form.remember_me.data))
 #
-#         return oid.try_login(form.openid.data, ask_for=['nickname', 'email', 'image', 'fullname', 'website'])
+# return oid.try_login(form.openid.data, ask_for=['nickname', 'email', 'image', 'fullname', 'website'])
 #
-#     return render_template('login.html',
-#                            title='Sign In',
+# return render_template('login.html',
+# title='Sign In',
 #                            form=form,
 #                            providers=app.config['OPENID_PROVIDERS'])
 #
@@ -237,7 +237,7 @@ def author(id, page=1):
 
     return render_template('author.html', author=author, similar_authors=author.similar_authors().limit(10),
                            articles=author_articles,
-                           collaborators=author.collaborators().limit(10))#, author_form=author_form)
+                           collaborators=author.collaborators().limit(10))  #, author_form=author_form)
 
 
 @app.route('/autocomplete/author/<search_term>')
@@ -295,6 +295,7 @@ def feed(id=None, page=1):
         db.session.commit()
 
         edit = True
+        return redirect(url_for('feed', id=f.id, edit=True))
     else:
         f = Feed.query.filter(Feed.id == id).first()
         s = Subscription.query.filter(and_(Subscription.feed_id == id, Subscription.user_id == g.user.id)).first()
@@ -326,10 +327,12 @@ def feed(id=None, page=1):
     else:
         if f is not None:
             articles = f.feed_articles().paginate(page, ARTICLES_PER_PAGE, False)
+            if articles.total == 0: edit = True
             form.enable_email.data = form.subscription.enable_email
             form.email_frequency.data = form.subscription.email_frequency
         else:
             articles = None
+            edit = True
     return render_template('feed.html', feed=f, form=form, articles=articles, user=g.user, edit=edit)
 
 

@@ -15,7 +15,7 @@ class Updater(Command):
 
     def get_options(self):
         return [
-            Option('-u', '--update_all', dest='update_all', default=self.default_name),
+            Option('-u', '--update_all', dest='update_all', default=self.default_update_all),
         ]
 
     def run(self, update_all=False):
