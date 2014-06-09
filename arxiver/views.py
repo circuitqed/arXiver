@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify
 from flask.ext.login import login_user, logout_user, current_user, login_required
-from arxiver import app, db, lm, googlelogin, ARTICLES_PER_PAGE  # ,oid
+from arxiver import app, db, lm, googlelogin, ARTICLES_PER_PAGE, Updater  # ,oid
 from forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm, AuthorForm
 # from models import User, ROLE_USER, ROLE_ADMIN
 from models import *
@@ -74,18 +74,19 @@ def inject_user():
 
 @app.route('/login2')
 def login2():
-    return render_template('login2.html', loginurl=googlelogin.login_url(redirect_uri=url_for('create_or_update_user',_external=True),
-                                                                         params={'next': url_for('index')}))
+    return render_template('login2.html',
+                           loginurl=googlelogin.login_url(redirect_uri=url_for('create_or_update_user', _external=True),
+                                                          params={'next': url_for('index')}))
 
 
 # @app.route('/login', methods=['GET', 'POST'])
 # @oid.loginhandler
 # def login():
 # if g.user is not None and g.user.is_authenticated():
-#         return redirect(url_for('index'))
-#     form = LoginForm()
-#     if form.validate_on_submit():
-#         session['remember_me'] = form.remember_me.data
+# return redirect(url_for('index'))
+# form = LoginForm()
+# if form.validate_on_submit():
+# session['remember_me'] = form.remember_me.data
 #         # flash('Login requested for OpenID="' + form.openid.data + '", remember_me=' + str(form.remember_me.data))
 #
 #         return oid.try_login(form.openid.data, ask_for=['nickname', 'email', 'image', 'fullname', 'website'])
@@ -154,18 +155,14 @@ def logout():
 @app.route('/search/<string:query>', methods=['GET', 'POST'])
 @app.route('/search/<string:query>/page/<int:page>', methods=['GET', 'POST'])
 def index(page=1, query=None):
-    start_time = time.time()
     articles = None
     if request.method == 'POST':
         return redirect(url_for('index', query=request.form['query']))
     if query is not None:
-        print "running query"
         articles = Article.simple_search(query)
         print articles
         articles = articles.paginate(page, ARTICLES_PER_PAGE, False)
 
-        flash("Query time: %f s" % (time.time() - g.start_time))
-        print "query finished"
         return render_template('index.html', user=g.user, articles=articles)
     if g.user is not None and not g.user.is_anonymous():
         subscribed = False
@@ -175,7 +172,8 @@ def index(page=1, query=None):
         if not subscribed:
             print "Not subscribed"
             articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
-    flash("Query time: %f s" % (time.time() - g.start_time))
+    else:
+        articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
 
     return render_template('index.html', user=g.user, articles=articles)
 
@@ -330,6 +328,8 @@ def feed(id=None, page=1):
     else:
         if f is not None:
             articles = f.feed_articles().paginate(page, ARTICLES_PER_PAGE, False)
+            form.enable_email.data = form.subscription.enable_email
+            form.email_frequency.data = form.subscription.email_frequency
         else:
             articles = None
     return render_template('feed.html', feed=f, form=form, articles=articles, user=g.user, edit=edit)
@@ -452,3 +452,13 @@ def edit():
 @app.route('/about')
 def about():
     return render_template('about.html')
+
+
+@app.route('/update')
+@app.route('/update/<string:cmd>')
+def update(cmd=''):
+    u = Updater()
+    update_all = cmd == 'all'
+    u.run(update_all=update_all)
+
+    return '%d records added/updated.'

@@ -1,7 +1,7 @@
 __author__ = 'dave'
 
 import os
-from flask import Flask,url_for,request
+from flask import Flask, url_for, request
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.orderinglist import ordering_list
 from flask.ext.login import LoginManager
@@ -9,8 +9,8 @@ from flask.ext.openid import OpenID
 from config import basedir
 from config import ARTICLES_PER_PAGE
 from config import ADMINS, MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
-#from flask.ext.restful import Api
-from flask.ext.script import Manager,Shell
+# from flask.ext.restful import Api
+from flask.ext.script import Manager, Shell
 from flask.ext.migrate import Migrate, MigrateCommand
 
 # from social.apps.flask_app.routes import social_auth
@@ -21,6 +21,7 @@ from flask_googlelogin import GoogleLogin
 app = Flask(__name__, static_url_path='')
 app.config.from_object('config')
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 #PSA login
 #app.register_blueprint(social_auth)
@@ -29,18 +30,11 @@ db = SQLAlchemy(app)
 lm = LoginManager()
 lm.login_view = 'login2'
 lm.init_app(app)
-googlelogin = GoogleLogin(app,lm)
+googlelogin = GoogleLogin(app, lm)
 #oid = OpenID(app,os.path.join(basedir,'tmp'))
 
 
-#flask migrate
-migrate = Migrate(app, db)
-manager = Manager(app)
-manager.add_command('db', MigrateCommand)
-manager.add_command('shell', Shell(make_context=lambda: {
-    'app': app,
-    'db': db
-}))
+
 
 #api = Api(app)
 
@@ -51,8 +45,10 @@ def url_for_other_page(page):
     args['page'] = page
     return url_for(request.endpoint, **args)
 
+
 def datetimeformat(value, format='%H:%M / %d-%m-%Y'):
     return value.strftime(format)
+
 
 app.jinja_env.filters['datetimeformat'] = datetimeformat
 app.jinja_env.globals['url_for_other_page'] = url_for_other_page
@@ -77,5 +73,17 @@ if not app.debug:
 
     app.logger.addHandler(file_handler)
     app.logger.info(__name__ + ' startup')
-from arxiver import views, models  #, apis
+from arxiver import models  #, apis
+from arxiver.updater import Updater
+from arxiver import views
+
+#setup manager
+manager = Manager(app)
+manager.add_command('db', MigrateCommand)
+manager.add_command('shell', Shell(make_context=lambda: {
+    'app': app,
+    'db': db
+}))
+
+manager.add_command('update', Updater())
 

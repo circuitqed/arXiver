@@ -94,14 +94,18 @@ class FeedForm(Form):
         obj.public = self.public.data
         obj.name = self.name.data
         obj.timestamp = datetime.datetime.utcnow()
+
         return obj
 
     def __init__(self, *args, **kwargs):
         Form.__init__(self, *args, **kwargs)
-        self.subscription = kwargs['subscription']
-        if self.subscription is not None:
-            self.enable_email.data = self.subscription.enable_email
-            self.email_frequency.data = self.subscription.email_frequency
+        if 'subscription' in kwargs:
+            self.subscription = kwargs['subscription']
+            # if self.subscription is not None:
+            # self.enable_email.data = self.subscription.enable_email
+            #     self.email_frequency.data = self.subscription.email_frequency
+        else:
+            self.subscription = None
 
 
 class EditForm(Form):

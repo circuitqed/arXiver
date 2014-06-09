@@ -78,7 +78,7 @@ function bindKeywordTypeAhead() {
 function setupEditFeed() {
     $('a[data-remove-author]').click(function (event) {
         event.preventDefault();
-        var myURL=$(this).attr('href');
+        var myURL = $(this).attr('href');
 
         //$(this).hide();
         $(this).closest('span').hide();
@@ -100,7 +100,7 @@ function setupEditFeed() {
     $('a[data-remove-keyword]').click(function (event) {
         //$(this).hide();
         event.preventDefault();
-        var myURL=$(this).attr('href');
+        var myURL = $(this).attr('href');
         $(this).closest('span').hide();
         $.ajax({
             type: 'POST',
@@ -118,9 +118,11 @@ function setupEditFeed() {
 
     });
 
+
+
     $('a[data-add-keyword]').click(function (event) {
         event.preventDefault();
-        var myURL=$(this).attr('href');
+        var myURL = $(this).attr('href');
         var s = $($(this).attr('data-text')).val();
         console.log(myURL);
         $.ajax({
@@ -140,6 +142,12 @@ function setupEditFeed() {
 
     });
 
+    $('#keyword_typeahead').keyup(function (e) {
+        if (e.keyCode == 13) {
+            $('a[data-add-keyword]').trigger("click");
+        }
+    });
+
     $('#openBtn').click(function () {
         var s = $($(this).attr('data-text')).val();
         console.log(s);
@@ -152,6 +160,13 @@ function setupEditFeed() {
         event.preventDefault();
 
     });
+
+    $('#author_typeahead').keyup(function (e) {
+        if (e.keyCode == 13) {
+            $('#openBtn').trigger("click");
+        }
+    });
+
 
     if ($('#enable_email').attr('checked')) {
         $('#email_frequency').show();
