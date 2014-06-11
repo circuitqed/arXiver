@@ -48,7 +48,7 @@
 <span><input id="author_typeahead" type="text" class="author-typeahead">
         <a id="openBtn" href='{{ url_for('feed', id=feed.id, edit=True) }}'  data-text="#author_typeahead" data-feed_id='{{ feed.id }}' class="btn btn-info">+</a></span>
         <br/>
-        {% for author in feed.authors %}
+        {% for author in feed_authors %}
             <span>
         <a href="{{ url_for('author', id=author.id) }}">{{ author.forenames }} {{ author.lastname }}</a>
             <a href='{{ url_for('feed', id=feed.id, edit=True) }}'  data-author_id='{{ author.id }}' data-feed_id='{{ feed.id }}' data-remove-author

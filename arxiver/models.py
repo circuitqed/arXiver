@@ -137,7 +137,7 @@ class Feed(db.Model):
     timestamp = db.Column(db.DateTime)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)
 
-    authors = db.relationship('Author', secondary=feedauthors,
+    authors = db.relationship('Author', secondary=feedauthors, lazy='dynamic',
                               backref=db.backref('authors', lazy='dynamic'))
 
     keywords = db.relationship('Keyword', secondary=feedkeywords,
@@ -150,7 +150,7 @@ class Feed(db.Model):
 
 
     def feed_articles(self):
-        #explain (analyze,buffers) select * from article INNER JOIN (select id from article as blah where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select article_id from articlesauthors as blah where author_id in (54962, 55738, 85464, 85465, 125598, 55921)) on id=blah order by created desc;
+        # explain (analyze,buffers) select * from article INNER JOIN (select id from article as blah where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select article_id from articlesauthors as blah where author_id in (54962, 55738, 85464, 85465, 125598, 55921)) on id=blah order by created desc;
         #select * from (select distinct on (id) * from (select articles.* from articles where search_vector @@ ... union all select a.* from articles a join articlesauthors aa on ... where author_id = any (...)) s1) s2 order by created_at desc;
         #explain (analyze,buffers) select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         #select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
@@ -172,7 +172,7 @@ class Subscription(db.Model):
     feed_id = db.Column(db.Integer, db.ForeignKey('feed.id'), index=True)
 
     # def __init__(self, id=None, subscriber=None, feed=None, enable_email=None,email_frequency=None):
-    #     self.feed = feed
+    # self.feed = feed
     #     self.subscriber = subscriber
     #     super(Subscription).__init__(self,id=id,enable_email=enable_email,email_frequency=email_frequency)
 
@@ -219,7 +219,7 @@ class Author(db.Model):
         return self.forenames + ' ' + self.lastname
 
 
-#intermediate table used for ordering authors within articles
+# intermediate table used for ordering authors within articles
 class ArticleAuthor(db.Model):
     __tablename__ = 'articlesauthors'
 

@@ -93,8 +93,8 @@ def login2():
 #
 # return render_template('login.html',
 # title='Sign In',
-#                            form=form,
-#                            providers=app.config['OPENID_PROVIDERS'])
+# form=form,
+# providers=app.config['OPENID_PROVIDERS'])
 #
 #
 # @oid.after_login
@@ -333,7 +333,11 @@ def feed(id=None, page=1):
         else:
             articles = None
             edit = True
-    return render_template('feed.html', feed=f, form=form, articles=articles, user=g.user, edit=edit)
+
+    if f is not None:
+        feed_authors = f.authors.order_by(Author.lastname)
+    return render_template('feed.html', feed=f, form=form, articles=articles, feed_authors=feed_authors, user=g.user,
+                           edit=edit)
 
 
 @app.route('/add_feed_author', methods=['GET', 'POST'])
@@ -460,6 +464,6 @@ def about():
 def update(cmd=''):
     u = Updater()
     update_all = cmd == 'all'
-    u.run(update_all=update_all)
+    count = u.run(update_all=update_all)
 
-    return '%d records added/updated.'
+    return '%d records added/updated.' % count
