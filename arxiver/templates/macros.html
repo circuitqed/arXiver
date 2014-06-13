@@ -58,9 +58,7 @@
                                 <a href="http://arxiv.org/pdf/{{ article.arxiv_id }}"><i
                                         class="glyphicon glyphicon-file" style="color:#ff3a47"></i></a>
                                 {% for a in article.authors %}
-                                    <a href="{{ url_for('author', id=a.id) }}">{{ a.forenames }} {{ a.lastname }}</a>
-                                    {% if not loop.last %},
-                                    {% endif %}
+                                    <a href="{{ url_for('author', id=a.id) }}">{{ a.forenames }} {{ a.lastname }}</a>{% if not loop.last %},{% endif %}
                                 {% endfor %}
                             </h4>
                         </div>
@@ -75,7 +73,7 @@
                                 {% endif %}
                                 {% if article.doi %}
                                     <a
-                                            href="http://dx.doi.org/{{ article.doi }}">{{ article.doi }}</a>
+                                            href="http://dx.doi.org/{{ article.doi }}">doi: {{ article.doi }}</a>
                                 {% endif %}
                                 {% if article.journalref %}
                                     <span>{{ article.journalref }}</span>
