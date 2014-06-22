@@ -63,7 +63,7 @@ class AuthorForm(Form):
         if feed_id is not None:
             self.feeds.data = [feed_id]
 
-        self.similar_authors.choices = [(a.id, str(a)) for a in author.similar_authors()]
+        self.similar_authors.choices = [(a.id,  a.__repr__()) for a in author.similar_authors()]
         self.similar_authors.choices.insert(0, (author.id, str(author)))
 
 
