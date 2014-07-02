@@ -258,7 +258,7 @@ class Article(db.Model):
     search_vector = deferred(db.Column(TSVectorType('full_description')))
 
     #These set up the ordered list of authors
-    associations = db.relationship('ArticleAuthor',
+    associations = db.relationship('ArticleAuthor', order_by="ArticleAuthor.position",
                                    collection_class=ordering_list('position'),
                                    backref='article'
     )
