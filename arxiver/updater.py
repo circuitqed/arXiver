@@ -18,13 +18,16 @@ class Updater(Command):
             Option('-u', '--update_all', dest='update_all', default=self.default_update_all),
         ]
 
-    def run(self, update_all=False):
+    def run(self, update_all=False, override=False):
         arxiv = Sickle('http://export.arxiv.org/oai2')
 
         # date = datetime.date(2014, 5, 14)
         # records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
         # print str(datetime.date(2014, 5, 14))
         last_update = Synchronization.query.order_by(Synchronization.id.desc()).first()
+        if (datetime.datetime.utcnow() - last_update.date).days < 1:
+            return 0
+
         if last_update is None or update_all:
             date = None
             records = arxiv.ListRecords(metadataPrefix='arXiv')

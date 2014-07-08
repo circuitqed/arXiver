@@ -465,5 +465,6 @@ def update(cmd=''):
     u = Updater()
     update_all = cmd == 'all'
     count = u.run(update_all=update_all)
+    print "update"
 
     return '%d records added/updated.' % count

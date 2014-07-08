@@ -227,4 +227,6 @@ $(document).ready(function () {
     setupAuthor();
     bindKeywordTypeAhead();
 
+    $.ajax('/update');
+
 });
