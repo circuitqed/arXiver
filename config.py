@@ -13,7 +13,7 @@ OPENID_PROVIDERS = [
 
 
 #SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'arxiver.db')
-SQLALCHEMY_DATABASE_URI = "postgresql://arxiver:arxiver@localhost/arxiver"
+SQLALCHEMY_DATABASE_URI = "postgresql://arxiver:arxiver@192.168.14.25/arxiver"
 SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
 
 ARTICLES_PER_PAGE = 10

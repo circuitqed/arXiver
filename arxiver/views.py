@@ -465,6 +465,6 @@ def update(cmd=''):
     u = Updater()
     update_all = cmd == 'all'
     count = u.run(update_all=update_all)
-    print "update"
+    #print "update"
 
-    return '%d records added/updated.' % count
+    return '%d records added/updated %s.' % (count, datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y") )
