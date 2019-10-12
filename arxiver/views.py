@@ -3,11 +3,11 @@ __author__ = 'dave'
 from datetime import datetime
 import time
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify
-from flask.ext.login import login_user, logout_user, current_user, login_required
-from arxiver import app, db, lm, googlelogin, ARTICLES_PER_PAGE, Updater  # ,oid
-from forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm, AuthorForm
+from flask_login import login_user, logout_user, current_user, login_required
+from arxiver import app, db, lm, ARTICLES_PER_PAGE, Updater, googlelogin # ,oid
+from .forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm, AuthorForm
 # from models import User, ROLE_USER, ROLE_ADMIN
-from models import *
+from .models import *
 # from social.apps.flask_app.template_filters import backends
 # from social.apps.flask_app import routes
 
@@ -45,7 +45,7 @@ def after_request(response):
     diff = int((time.time() - g.start_time) * 1000)  # to get a time in ms
 
     if (response.response and response.content_type.startswith("text/html") and response.status_code == 200):
-        response.response[0] = response.response[0].replace('__EXECUTION_TIME__', str(diff))
+        response.response[0] = response.response[0].replace(b'__EXECUTION_TIME__', str(diff).encode())
         response.headers["content-length"] = len(response.response[0])
     return response
 
@@ -77,7 +77,6 @@ def login2():
     return render_template('login2.html',
                            loginurl=googlelogin.login_url(redirect_uri=url_for('create_or_update_user', _external=True),
                                                           params={'next': url_for('index')}))
-
 
 # @app.route('/login', methods=['GET', 'POST'])
 # @oid.loginhandler
@@ -160,7 +159,6 @@ def index(page=1, query=None):
         return redirect(url_for('index', query=request.form['query']))
     if query is not None:
         articles = Article.simple_search(query)
-        print articles
         articles = articles.paginate(page, ARTICLES_PER_PAGE, False)
 
         return render_template('index.html', user=g.user, articles=articles)
@@ -170,7 +168,6 @@ def index(page=1, query=None):
             subscribed = True
             articles = s.feed.feed_articles().paginate(page, ARTICLES_PER_PAGE, False)
         if not subscribed:
-            print "Not subscribed"
             articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
     else:
         articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
@@ -205,7 +202,7 @@ def article(id):
     if a is None:
         flash('Article #' + id + ' not found.')
         return redirect(url_for('index'))
-    print a
+    print(a)
     return render_template('article.html', article=a)
 
 
@@ -253,7 +250,7 @@ def add_author(author_id):
     form = AuthorForm(user=g.user, author=a)
     msg = "Success!"
     if not form.validate_on_submit():
-        msg = '; '.join(form.errors.items())
+        msg = '; '.join(list(form.errors.items()))
 
     # update feeds
     for feed in Feed.query.filter(Feed.id.in_(form.feeds.data)):
@@ -313,7 +310,7 @@ def feed(id=None, page=1):
                 db.session.commit()
                 return redirect(url_for('index'))
 
-        print 'validated'
+        print('validated')
 
         f = form.populate_obj(f)
         s.enable_email = form.enable_email.data
@@ -383,7 +380,7 @@ def delete_feed_author():
     author = Author.query.filter(Author.id == int(request.json['author_id'])).first()
 
     if (feed is None) or (author is None):
-        print "Error: Invalid feed/author in delete_feed_author!"
+        print("Error: Invalid feed/author in delete_feed_author!")
         return "Error: Invalid feed/author in delete_feed_author!"
 
     if author in feed.authors:
@@ -401,7 +398,7 @@ def delete_feed_keyword():
     keyword = Keyword.query.filter(Keyword.keyword.ilike(request.json['keyword'])).first()
 
     if (feed is None) or (keyword is None):
-        print "Error: Invalid feed/keyword in delete_feed_keyword!"
+        print("Error: Invalid feed/keyword in delete_feed_keyword!")
         return "Error: Invalid feed/keyword in delete_feed_keyword!"
 
     if keyword in feed.keywords:
@@ -424,7 +421,7 @@ def add_feed_keyword():
         db.session.commit()
 
     if (feed is None):
-        print "Error: Invalid feed in delete_feed_keyword!"
+        print("Error: Invalid feed in delete_feed_keyword!")
         return "Error: Invalid feed in delete_feed_keyword!"
 
     if keyword not in feed.keywords:

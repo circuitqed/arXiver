@@ -3,7 +3,7 @@ __author__ = 'dave'
 from flask import abort, request, make_response, url_for
 from flask.ext.restful import Resource, reqparse, marshal, fields
 from arxiver import api, db, app
-from models import *
+from .models import *
 from sqlalchemy import or_, and_
 
 
@@ -25,7 +25,7 @@ class ArticleListAPI(Resource):
     def get(self):
         args = self.rparse.parse_args()
         r = request
-        print args
+        print(args)
         author_fields = {
             'lastname': fields.String,
             'forenames': fields.String,
@@ -55,8 +55,8 @@ class ArticleListAPI(Resource):
         if conditions == []:
             return {}
         articles = Article.query.filter(and_(*conditions))
-        print articles
-        return map(lambda t: marshal(t, article_fields), articles)
+        print(articles)
+        return [marshal(t, article_fields) for t in articles]
 
 
 class ArticleAPI(Resource):
@@ -117,7 +117,7 @@ class AuthorAPI(Resource):
         similar_authors = Author.query.filter(Author.lastname.ilike(a.lastname)).filter(
             Author.forenames.ilike(a.forenames[0] + '%'))
         if similar_authors is not None:
-            ans['similar_authors'] = map(lambda t: marshal(t, article_author_fields), similar_authors)
+            ans['similar_authors'] = [marshal(t, article_author_fields) for t in similar_authors]
         else:
             ans['similar_authors'] = []
         return ans
@@ -145,11 +145,11 @@ class FeedAPI(Resource):
         }
         ans = marshal(feed, feed_fields)
         if include_articles:
-            ans['feed_articles'] = map(lambda t: marshal(t, article_fields), feed.feed_articles())
+            ans['feed_articles'] = [marshal(t, article_fields) for t in feed.feed_articles()]
         return ans
 
     def get(self, id=None):
-        print id
+        print(id)
         f = Feed.query.filter(Feed.id == id).first()
 
         if f is None: return {}
@@ -167,7 +167,7 @@ class FeedAPI(Resource):
             'abstract': fields.String,
             'authors': fields.List(fields.Nested(author_fields))
         }
-        return map(lambda t: marshal(t, article_fields), articles)
+        return [marshal(t, article_fields) for t in articles]
 
     def post(self):
         args = self.rparse.parse_args()

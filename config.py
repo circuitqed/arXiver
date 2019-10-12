@@ -1,7 +1,7 @@
 import os
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-CSRF_ENABLED = True 
+CSRF_ENABLED = True
 SECRET_KEY = 'this is a secret key'
 
 OPENID_PROVIDERS = [
@@ -13,7 +13,7 @@ OPENID_PROVIDERS = [
 
 
 #SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'arxiver.db')
-SQLALCHEMY_DATABASE_URI = "postgresql://arxiver:arxiver@192.168.14.25/arxiver"
+SQLALCHEMY_DATABASE_URI = "postgresql://arxiver:arxiver@localhost/arxiver"
 SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
 
 ARTICLES_PER_PAGE = 10
@@ -116,3 +116,6 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = 'iacneFZ1bYEa6MPH12J3RquR'
 GOOGLE_LOGIN_CLIENT_ID='499231713930-piv0f3vrh9v9b5i6rvspa8oqd0hp83aq.apps.googleusercontent.com'
 GOOGLE_LOGIN_CLIENT_SECRET='iacneFZ1bYEa6MPH12J3RquR'
 #GOOGLE_LOGIN_REDIRECT_URI='http://localhost:5000/oauth2callback'
+
+GOOGLE_LOGIN_REDIRECT_SCHEME = "http"
+GOOGLE_LOGIN_REDIRECT_PATH = "/oauth2callback"

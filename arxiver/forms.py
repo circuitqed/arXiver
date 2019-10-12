@@ -1,6 +1,6 @@
 __author__ = 'dave'
 
-from flask.ext.wtf import Form
+from flask_wtf import Form
 from wtforms import TextField, TextAreaField, BooleanField, SelectMultipleField, FieldList, SelectField, HiddenField, \
     widgets
 from wtforms.validators import Required, Length

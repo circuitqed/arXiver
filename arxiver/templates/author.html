@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block header %}
-    {% if g.user.is_authenticated() %}
+    {% if g.user.is_authenticated %}
         <a id="followAuthorBtn" href="{{ url_for('author', id=author.id) }}" class="btn btn-primary btn-lg"
            data-author-names="{{ author.forenames }} {{ author.lastname }}" data-author-id="{{ author.id }}"
            style="float:right">

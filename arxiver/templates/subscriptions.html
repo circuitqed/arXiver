@@ -1,6 +1,6 @@
 <ul class="nav nav-list">
     <li class="nav-header">Subscriptions:</li>
-    {% if g.user.is_authenticated() %}
+    {% if g.user.is_authenticated %}
         {% for s in user.subscriptions %}
             <li><a href="{{ url_for("feed",id=s.feed.id) }}">{{ s.feed.name }}</a></li>
         {% endfor %}

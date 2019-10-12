@@ -6,7 +6,7 @@ from sickle import Sickle
 import datetime, dateutil
 from arxiver.models import Article, Author, Category, Synchronization
 from arxiver import db
-from flask.ext.script import Command, Option
+from flask_script import Command, Option
 
 
 class Updater(Command):
@@ -39,17 +39,17 @@ class Updater(Command):
         badrecords = []
         for r in records:
             count += 1
-            if count % 1000 == 0: print count
+            if count % 1000 == 0: print(count)
             try:
                 a = self.add_article(r.metadata)
             except Exception as e:
                 badrecords.append(r)
-                print "Exception: ", e
+                print(("Exception: ", e))
             # print a.title
             db.session.commit()
         db.session.add(Synchronization(date=datetime.datetime.now()))
         db.session.commit()
-        print "all done!"
+        print("all done!")
         return count
 
     def add_category(self, name):
@@ -96,7 +96,7 @@ class Updater(Command):
                 category = self.add_category(catname)
                 a.categories.append(category)
 
-        a_str = u""
+        a_str = ""
         for fname, lname in zip(metadata['forenames'], metadata['keyname']):
             author = self.add_author(fname, lname)
             a_str += author.__repr__() + ' '

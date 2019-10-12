@@ -5,16 +5,17 @@ from arxiver import db
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy import or_, and_, func
+import sqlalchemy
 
 # fulltext imports from http://sqlalchemy-searchable.readthedocs.org/en/latest/
-from flask.ext.sqlalchemy import BaseQuery
+from flask_sqlalchemy import BaseQuery
 from sqlalchemy_searchable import search, make_searchable, parse_search_query
 from sqlalchemy_utils.types import TSVectorType
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import cast
 from sqlalchemy.types import Interval
 from sqlalchemy.orm import deferred
-from flask.ext.login import UserMixin
+from flask_login import UserMixin
 # from social.apps.flask_app import models
 
 import datetime
@@ -52,8 +53,8 @@ articlelikes = db.Table('articlelikes',
                         db.Column('user_id', db.Integer, db.ForeignKey('user.id'), index=True)
 )
 
+#make_searchable(db.metadata)
 make_searchable()
-
 
 class SearchQueryMixin(object):
     def search(self, search_query, vector=None, catalog=None):
@@ -124,7 +125,7 @@ class User(db.Model, UserMixin):
         return False
 
     def get_id(self):
-        return unicode(self.id)
+        return str(self.id)
 
     def __repr__(self):
         return '<User %r>' % (self.username)
@@ -154,6 +155,7 @@ class Feed(db.Model):
         #select * from (select distinct on (id) * from (select articles.* from articles where search_vector @@ ... union all select a.* from articles a join articlesauthors aa on ... where author_id = any (...)) s1) s2 order by created_at desc;
         #explain (analyze,buffers) select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         #select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
+        #search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         alist = [a.id for a in self.authors]
         s1 = select([ArticleAuthor.article_id]).where(ArticleAuthor.author_id.in_(alist))
@@ -270,7 +272,10 @@ class Article(db.Model):
 
     @staticmethod
     def simple_search(query):
+        #q= db.session.query(Article)
+        #q1= search(q,query, vector=Article.search_vector)
         q1 = Article.query.filter(Article.search_vector.match_tsquery(parse_search_query(query)))
+        #q1 = Article.query.filter(Article.search_vector.match(sqlalchemy.func.tsqparse(query)))
         #q2 = Article.query.filter(Article.authors.any(Author.lastname.ilike(query)))
         #q2 = Article.query.filter(Article.authors.any(func.lower(Author.lastname) == func.lower(query)))
 

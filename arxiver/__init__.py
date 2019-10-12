@@ -2,21 +2,22 @@ __author__ = 'dave'
 
 import os
 from flask import Flask, url_for, request
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.orderinglist import ordering_list
-from flask.ext.login import LoginManager
-from flask.ext.openid import OpenID
+from flask_login import LoginManager
+from flask_openid import OpenID
 from config import basedir
 from config import ARTICLES_PER_PAGE
 from config import ADMINS, MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD
 # from flask.ext.restful import Api
-from flask.ext.script import Manager, Shell
-from flask.ext.migrate import Migrate, MigrateCommand
+from flask_script import Manager, Shell
+from flask_migrate import Migrate, MigrateCommand
 
 # from social.apps.flask_app.routes import social_auth
 # from social.apps.flask_app.models import init_social
 
-from flask_googlelogin import GoogleLogin
+from .flask_googlelogin import GoogleLogin
+#from flask_oauth2_login import GoogleLogin
 
 app = Flask(__name__, static_url_path='')
 app.config.from_object('config')
@@ -30,7 +31,8 @@ migrate = Migrate(app, db)
 lm = LoginManager()
 lm.login_view = 'login2'
 lm.init_app(app)
-googlelogin = GoogleLogin(app, lm)
+googlelogin = GoogleLogin(app,lm)
+googlelogin.get_profile = lambda x: print ("get_profile")
 #oid = OpenID(app,os.path.join(basedir,'tmp'))
 
 
