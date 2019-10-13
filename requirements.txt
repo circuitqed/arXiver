@@ -1,0 +1,3 @@
+flask_wtf==0.12
+sqlalchemy_searchable==0.10
+sqlalchemy_utils==0.28

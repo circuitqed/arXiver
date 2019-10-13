@@ -34,7 +34,9 @@ def load_user(id):
 def before_request():
     g.user = current_user
     g.start_time = time.time()
-    if g.user.is_authenticated():
+#    with open('/home/dave/arXiver/tmp/test.txt','a') as f:
+#        f.write(dir(g.user))
+    if g.user.is_authenticated:
         g.user.last_seen = datetime.datetime.utcnow()
         db.session.add(g.user)
         db.session.commit()
@@ -162,7 +164,7 @@ def index(page=1, query=None):
         articles = articles.paginate(page, ARTICLES_PER_PAGE, False)
 
         return render_template('index.html', user=g.user, articles=articles)
-    if g.user is not None and not g.user.is_anonymous():
+    if g.user is not None and not g.user.is_anonymous:
         subscribed = False
         for s in g.user.subscriptions:
             subscribed = True

@@ -115,12 +115,15 @@ class User(db.Model, UserMixin):
             version += 1
         return new_nickname
 
+    @property
     def is_authenticated(self):
         return True
 
+    @property
     def is_active(self):
         return self.active
 
+    @property
     def is_anonymous(self):
         return False
 
