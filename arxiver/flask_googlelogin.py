@@ -56,7 +56,6 @@ def make_secure_token(*args, **options):
     if hasattr(token_value, 'encode'):  # pragma: no cover
         token_value = token_value.encode('utf-8')  # ensure bytes
 
-    print (token_value)
     return token_value
 
 def convert_dictkeys(d):

@@ -2,14 +2,12 @@ __author__ = 'dave'
 
 from datetime import datetime
 import time
-from flask import render_template, redirect, flash, session, url_for, request, g, jsonify
+from flask import render_template, redirect, flash, session, url_for, request, g, jsonify, abort
 from flask_login import login_user, logout_user, current_user, login_required
-from arxiver import app, db, lm, ARTICLES_PER_PAGE, Updater, googlelogin # ,oid
+from arxiver import app, db, lm, ARTICLES_PER_PAGE, googlelogin
+from arxiver.updater import Updater
 from .forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm, AuthorForm
-# from models import User, ROLE_USER, ROLE_ADMIN
 from .models import *
-# from social.apps.flask_app.template_filters import backends
-# from social.apps.flask_app import routes
 
 
 @app.errorhandler(404)
@@ -71,57 +69,11 @@ def inject_user():
         return {'user': None}
 
 
-# app.context_processor(backends)
-
-
 @app.route('/login2')
 def login2():
     return render_template('login2.html',
                            loginurl=googlelogin.login_url(redirect_uri=url_for('create_or_update_user', _external=True),
                                                           params={'next': url_for('index')}))
-
-# @app.route('/login', methods=['GET', 'POST'])
-# @oid.loginhandler
-# def login():
-# if g.user is not None and g.user.is_authenticated():
-# return redirect(url_for('index'))
-# form = LoginForm()
-# if form.validate_on_submit():
-# session['remember_me'] = form.remember_me.data
-# # flash('Login requested for OpenID="' + form.openid.data + '", remember_me=' + str(form.remember_me.data))
-#
-# return oid.try_login(form.openid.data, ask_for=['nickname', 'email', 'image', 'fullname', 'website'])
-#
-# return render_template('login.html',
-# title='Sign In',
-# form=form,
-# providers=app.config['OPENID_PROVIDERS'])
-#
-#
-# @oid.after_login
-# def after_login(resp):
-#     print resp.nickname, resp.email, resp.image, resp.fullname, resp.website
-#     if resp.email is None or resp.email == '':
-#         flash('Invalid login: email is missing! Please try again.')
-#         return redirect(url_for('login'))
-#
-#     user = User.query.filter_by(email=resp.email).first()
-#     if user is None:
-#         nickname = resp.nickname
-#         if nickname is None or nickname == '':
-#             nickname = resp.email.split('@')[0]
-#         nickname = User.make_unique_nickname(nickname)
-#         user = User(nickname=nickname, email=resp.email, fullname=resp.fullname, role=ROLE_USER)
-#         db.session.add(user)
-#         db.session.commit()
-#     remember_me = False
-#     if 'remember_me' in session:
-#         remember_me = session['remember_me']
-#         session.pop('remember_me', None)
-#     if login_user(user, remember=remember_me):
-#         flash(user.nickname + ' logged in Successfully')
-#     return redirect(request.args.get('next') or url_for('index'))
-#
 
 @app.route('/oauth2callback')
 @googlelogin.oauth2callback
@@ -461,9 +413,11 @@ def about():
 @app.route('/update')
 @app.route('/update/<string:cmd>')
 def update(cmd=''):
+    token = request.args.get('token', '')
+    if not token or token != app.config.get('UPDATE_TOKEN', ''):
+        abort(403)
     u = Updater()
     update_all = cmd == 'all'
     count = u.run(update_all=update_all)
-    #print "update"
 
     return '%d records added/updated %s.' % (count, datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y") )

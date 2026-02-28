@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:15
+    container_name: arxiver-db
+    environment:
+      POSTGRES_USER: arxiver
+      POSTGRES_PASSWORD: arxiver
+      POSTGRES_DB: arxiver
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    shm_size: '256mb'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arxiver"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arxiver
+    ports:
+      - "7854:5000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - FLASK_DEBUG=0
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

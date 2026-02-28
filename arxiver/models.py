@@ -1,6 +1,5 @@
 __author__ = 'dave'
 
-from hashlib import md5
 from arxiver import db
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -9,11 +8,32 @@ import sqlalchemy
 
 # fulltext imports from http://sqlalchemy-searchable.readthedocs.org/en/latest/
 from flask_sqlalchemy import BaseQuery
-from sqlalchemy_searchable import search, make_searchable, parse_search_query
+from sqlalchemy_searchable import search, make_searchable
 from sqlalchemy_utils.types import TSVectorType
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import cast
 from sqlalchemy.types import Interval
+
+
+def parse_search_query(query):
+    """Convert a human search query to PostgreSQL tsquery format.
+    Compatibility shim for older sqlalchemy_searchable API.
+    Adjacent terms get implicit & between them.
+    'or' maps to |, 'and' maps to &."""
+    tokens = query.split()
+    result = []
+    for token in tokens:
+        lower = token.lower()
+        if lower == 'or':
+            result.append('|')
+        elif lower == 'and':
+            result.append('&')
+        elif lower not in ('', '(', ')'):
+            # Insert implicit & between consecutive terms
+            if result and result[-1] not in ('|', '&'):
+                result.append('&')
+            result.append(token.replace("'", "''") + ':*')
+    return ' '.join(result) if result else ''
 from sqlalchemy.orm import deferred
 from flask_login import UserMixin
 # from social.apps.flask_app import models
@@ -53,8 +73,7 @@ articlelikes = db.Table('articlelikes',
                         db.Column('user_id', db.Integer, db.ForeignKey('user.id'), index=True)
 )
 
-#make_searchable(db.metadata)
-make_searchable()
+make_searchable(db.metadata)
 
 class SearchQueryMixin(object):
     def search(self, search_query, vector=None, catalog=None):
@@ -90,6 +109,7 @@ class User(db.Model, UserMixin):
     active = db.Column(db.Boolean, default=True)
     role = db.Column(db.Integer, default=ROLE_USER)
     last_seen = db.Column(db.DateTime())
+    avatar = db.Column(db.String())
     enable_email = db.Column(db.Boolean)
     email_frequency = db.Column(db.Integer)
 
@@ -99,9 +119,6 @@ class User(db.Model, UserMixin):
 
     likes = db.relationship('Article', secondary=articlelikes,
                             backref=db.backref('likers', lazy='dynamic'))
-
-    def avatar(self, size):
-        return 'http://www.gravatar.com/avatar/' + md5(self.email).hexdigest() + '?d=mm&s=' + str(size)
 
     @staticmethod
     def make_unique_nickname(nickname):
@@ -162,7 +179,7 @@ class Feed(db.Model):
         search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         alist = [a.id for a in self.authors]
         s1 = select([ArticleAuthor.article_id]).where(ArticleAuthor.author_id.in_(alist))
-        s2 = select([Article.id]).where(Article.search_vector.match_tsquery(search_query))
+        s2 = select([Article.id]).where(Article.search_vector.op('@@')(func.to_tsquery(search_query)))
         q = Article.query.filter(Article.id.in_(s1.union(s2))).order_by((Article.created + cast("0",
                                                                                                 Interval)).desc())  #The addition of the extra interval is important because it changes the way the query plan is computed and makes it run 100x faster!
         return q
@@ -277,7 +294,7 @@ class Article(db.Model):
     def simple_search(query):
         #q= db.session.query(Article)
         #q1= search(q,query, vector=Article.search_vector)
-        q1 = Article.query.filter(Article.search_vector.match_tsquery(parse_search_query(query)))
+        q1 = Article.query.filter(Article.search_vector.op('@@')(func.to_tsquery(parse_search_query(query))))
         #q1 = Article.query.filter(Article.search_vector.match(sqlalchemy.func.tsqparse(query)))
         #q2 = Article.query.filter(Article.authors.any(Author.lastname.ilike(query)))
         #q2 = Article.query.filter(Article.authors.any(func.lower(Author.lastname) == func.lower(query)))

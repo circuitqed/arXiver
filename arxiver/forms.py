@@ -1,31 +1,28 @@
-__author__ = 'dave'
-
-from flask_wtf import Form
-from wtforms import TextField, TextAreaField, BooleanField, SelectMultipleField, FieldList, SelectField, HiddenField, \
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField, BooleanField, SelectMultipleField, FieldList, SelectField, HiddenField, \
     widgets
-from wtforms.validators import Required, Length
-from wtforms.ext.sqlalchemy.orm import model_form
+from wtforms.validators import DataRequired, Length
 
 from arxiver.models import *
 from arxiver import db
 
 
-class LoginForm(Form):
-    openid = TextField('openid', validators=[Required()])
+class LoginForm(FlaskForm):
+    openid = StringField('openid', validators=[DataRequired()])
     remember_me = BooleanField('remember_me', default=False)
 
 
-class EditUserForm(Form):
-    nickname = TextField('nickname', validators=[Required()])
-    fullname = TextField('fullname')
+class EditUserForm(FlaskForm):
+    nickname = StringField('nickname', validators=[DataRequired()])
+    fullname = StringField('fullname')
     about_me = TextAreaField('about_me', validators=[Length(min=0, max=140)])
 
     def __init__(self, original_nickname, *args, **kwargs):
-        Form.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.original_nickname = original_nickname
 
-    def validate(self):
-        if not Form.validate(self):
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators=extra_validators):
             return False
         if self.nickname.data == self.original_nickname:
             return True
@@ -48,7 +45,7 @@ class MultiCheckboxField(SelectMultipleField):
     option_widget = widgets.CheckboxInput()
 
 
-class AuthorForm(Form):
+class AuthorForm(FlaskForm):
     feeds = MultiCheckboxField(coerce=int)
     similar_authors = MultiCheckboxField(coerce=int)
 
@@ -57,7 +54,7 @@ class AuthorForm(Form):
         return query
 
     def __init__(self, user=None, author=None, feed_id=None, *args, **kwargs):
-        Form.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.feeds.choices = [(f.id, f.name ) for f in user.feeds]
         if feed_id is not None:
@@ -67,25 +64,25 @@ class AuthorForm(Form):
         self.similar_authors.choices.insert(0, (author.id, str(author)))
 
 
-class SearchForm(Form):
-    title = TextField('title')
-    author = TextField('author')
-    keyword = TextField('keyword')
+class SearchForm(FlaskForm):
+    title = StringField('title')
+    author = StringField('author')
+    keyword = StringField('keyword')
     category = SelectMultipleField()
-    year = TextField('year')
+    year = StringField('year')
 
-    def __index__(self, *args, **kwargs):
-        super.__init__(self, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.category.choices = [(c.name, c.name) for c in Category.query.order_by('name')]
 
 
-class SimpleSearchForm(Form):
-    query = TextField('query')
+class SimpleSearchForm(FlaskForm):
+    query = StringField('query')
 
 
 # learned from https://gist.github.com/kageurufu/6813878
-class FeedForm(Form):
-    name = TextField('Name')
+class FeedForm(FlaskForm):
+    name = StringField('Name')
     public = BooleanField('Public')
     enable_email = BooleanField('Email subscribe')
     email_frequency = SelectField('Frequency', choices=( (0, 'Daily'), (1, 'Weekly'), (2, 'Monthly')), coerce=int)
@@ -97,31 +94,25 @@ class FeedForm(Form):
 
         return obj
 
-    def __init__(self, *args, **kwargs):
-        Form.__init__(self, *args, **kwargs)
-        if 'subscription' in kwargs:
-            self.subscription = kwargs['subscription']
-            # if self.subscription is not None:
-            # self.enable_email.data = self.subscription.enable_email
-            #     self.email_frequency.data = self.subscription.email_frequency
-        else:
-            self.subscription = None
+    def __init__(self, formdata=None, obj=None, subscription=None, **kwargs):
+        super().__init__(formdata=formdata, obj=obj, **kwargs)
+        self.subscription = subscription
 
 
-class EditForm(Form):
-    nickname = TextField('nickname', validators=[Required()])
-    fullname = TextField('fullname')
-    email = TextField('email')
+class EditForm(FlaskForm):
+    nickname = StringField('nickname', validators=[DataRequired()])
+    fullname = StringField('fullname')
+    email = StringField('email')
     enable_email = BooleanField('Email subscribe')
     email_frequency = SelectField('Frequency', choices=( ('0', 'Daily'), ('1', 'Weekly'), ('2', 'Monthly')))
 
 
     def __init__(self, original_nickname, *args, **kwargs):
-        Form.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.original_nickname = original_nickname
 
-    def validate(self):
-        if not Form.validate(self):
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators=extra_validators):
             return False
         if self.nickname.data == self.original_nickname:
             return True
@@ -131,4 +122,3 @@ class EditForm(Form):
             return False
 
         return True
-

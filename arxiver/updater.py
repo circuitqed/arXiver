@@ -3,34 +3,25 @@
 __author__ = 'dave'
 
 from sickle import Sickle
-import datetime, dateutil
+import datetime
 from arxiver.models import Article, Author, Category, Synchronization
 from arxiver import db
-from flask_script import Command, Option
-
-
-class Updater(Command):
+class Updater:
     def __init__(self, default_update_all=False):
         self.default_update_all = default_update_all
 
-    def get_options(self):
-        return [
-            Option('-u', '--update_all', dest='update_all', default=self.default_update_all),
-        ]
-
-    def run(self, update_all=False, override=False):
+    def run(self, update_all=False):
         arxiv = Sickle('http://export.arxiv.org/oai2')
 
         # date = datetime.date(2014, 5, 14)
         # records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
         # print str(datetime.date(2014, 5, 14))
         last_update = Synchronization.query.order_by(Synchronization.id.desc()).first()
-        if (datetime.datetime.utcnow() - last_update.date).days < 1:
-            return 0
-
         if last_update is None or update_all:
             date = None
             records = arxiv.ListRecords(metadataPrefix='arXiv')
+        elif (datetime.datetime.utcnow() - last_update.date).days < 1:
+            return 0
         else:
             date = last_update.date.date()
             records = arxiv.ListRecords(**{'metadataPrefix': 'arXiv', 'from': str(date)})
