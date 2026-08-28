@@ -1,0 +1,10 @@
+.git
+db-init
+tmp/*.log
+__pycache__
+*.pyc
+.dockerignore
+docker-compose.yml
+restore-db.sh
+start-arxiver.sh
+CLAUDE.md

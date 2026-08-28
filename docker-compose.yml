@@ -36,5 +36,20 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  cron:
+    image: alpine:latest
+    container_name: arxiver-cron
+    depends_on:
+      - app
+    env_file:
+      - .env
+    command:
+      - sh
+      - -c
+      - |
+        echo "15 8 * * * wget -qO- --timeout=3600 \"http://app:5000/update?token=$$UPDATE_TOKEN\"" > /etc/crontabs/root
+        crond -f -l 8
+    restart: unless-stopped
+
 volumes:
   pgdata:
