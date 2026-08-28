@@ -2,10 +2,77 @@ __author__ = 'dave'
 
 from datetime import datetime
 import time
+import os
+import json
+import fcntl
+import threading
+import traceback
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify, abort
 from flask_login import login_user, logout_user, current_user, login_required
 from arxiver import app, db, lm, ARTICLES_PER_PAGE, googlelogin
 from arxiver.updater import Updater
+
+UPDATE_STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tmp', 'update_state.json')
+UPDATE_LOCK_FILE = UPDATE_STATE_FILE + '.lock'
+_DEFAULT_STATE = {'running': False, 'started': None, 'finished': None, 'count': None, 'error': None}
+
+
+def _read_update_state():
+    try:
+        with open(UPDATE_STATE_FILE, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return dict(_DEFAULT_STATE)
+
+
+def _write_update_state(state):
+    tmp = UPDATE_STATE_FILE + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(state, f)
+    os.replace(tmp, UPDATE_STATE_FILE)
+
+
+def _claim_update_slot():
+    """Atomically try to mark an update as running. Returns (claimed, state)."""
+    os.makedirs(os.path.dirname(UPDATE_LOCK_FILE), exist_ok=True)
+    with open(UPDATE_LOCK_FILE, 'w') as lockf:
+        fcntl.flock(lockf, fcntl.LOCK_EX)
+        state = _read_update_state()
+        if state.get('running'):
+            return False, state
+        state = {
+            'running': True,
+            'started': datetime.datetime.now().isoformat(),
+            'finished': None,
+            'count': None,
+            'error': None,
+        }
+        _write_update_state(state)
+        return True, state
+
+
+def _finish_update_slot(count=None, error=None):
+    with open(UPDATE_LOCK_FILE, 'w') as lockf:
+        fcntl.flock(lockf, fcntl.LOCK_EX)
+        state = _read_update_state()
+        state['running'] = False
+        state['finished'] = datetime.datetime.now().isoformat()
+        state['count'] = count
+        state['error'] = error
+        _write_update_state(state)
+
+
+def _run_update_async(update_all):
+    with app.app_context():
+        try:
+            count = Updater().run(update_all=update_all)
+            _finish_update_slot(count=count)
+            app.logger.info('background update finished: %d records', count)
+        except Exception:
+            tb = traceback.format_exc()
+            _finish_update_slot(error=tb)
+            app.logger.error('background update failed:\n%s', tb)
+            db.session.rollback()
 from .forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm, AuthorForm
 from .models import *
 
@@ -416,8 +483,11 @@ def update(cmd=''):
     token = request.args.get('token', '')
     if not token or token != app.config.get('UPDATE_TOKEN', ''):
         abort(403)
-    u = Updater()
+    if cmd == 'status':
+        return jsonify(_read_update_state())
     update_all = cmd == 'all'
-    count = u.run(update_all=update_all)
-
-    return '%d records added/updated %s.' % (count, datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y") )
+    claimed, state = _claim_update_slot()
+    if not claimed:
+        return 'update already running since %s.\n' % state.get('started', '(unknown)'), 409
+    threading.Thread(target=_run_update_async, args=(update_all,), daemon=True).start()
+    return 'update started %s. check /update/status?token=... for progress.\n' % state['started'], 202
