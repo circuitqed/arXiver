@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block header %}
+    <h1>Sign In</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="well">
+                <p>Enter your email address and we'll send you a link that signs you in.
+                    No password to remember.</p>
+                <form action="{{ url_for('login') }}" method="post" role="form">
+                    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+                    <div class="form-group">
+                        <label for="email">Email address</label>
+                        <input type="email" class="form-control" id="email" name="email"
+                               value="{{ email or '' }}" placeholder="you@example.com"
+                               autocomplete="email" autofocus required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Email me a sign-in link</button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

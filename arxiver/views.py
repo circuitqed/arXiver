@@ -9,7 +9,8 @@ import threading
 import traceback
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify, abort
 from flask_login import login_user, logout_user, current_user, login_required
-from arxiver import app, db, lm, ARTICLES_PER_PAGE, googlelogin
+from sqlalchemy.exc import IntegrityError
+from arxiver import app, db, lm, ARTICLES_PER_PAGE, magiclink
 from arxiver.updater import Updater
 
 UPDATE_STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tmp', 'update_state.json')
@@ -136,37 +137,104 @@ def inject_user():
         return {'user': None}
 
 
+def _allowed_to_sign_in(email):
+    """Check the address against SIGNIN_ALLOWLIST. Empty list lets anyone in."""
+    raw = (app.config.get('SIGNIN_ALLOWLIST') or '').strip()
+    if not raw:
+        return True
+    domain = email.rsplit('@', 1)[-1]
+    for entry in raw.split(','):
+        entry = entry.strip().lower()
+        if not entry:
+            continue
+        if entry == email or entry == domain or entry == '@' + domain:
+            return True
+    return False
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Ask for an email address and mail a sign-in link to it."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    next_url = magiclink.safe_next(request.args.get('next'))
+
+    if request.method == 'POST':
+        email = magiclink.normalize_email(request.form.get('email'))
+        next_url = magiclink.safe_next(request.form.get('next')) or next_url
+        if not magiclink.valid_email(email):
+            flash("That doesn't look like an email address.")
+            return render_template('login.html', title='Sign In',
+                                   email=request.form.get('email'), next=next_url)
+
+        ip = magiclink.client_ip(request)
+        # Everything below reports the same outcome to the browser. A
+        # rate-limited address, one that isn't on the allowlist, and a
+        # fresh one all look identical, so the form can't be used to
+        # enumerate who has an account here.
+        if _allowed_to_sign_in(email) and not magiclink.rate_limited(email, ip):
+            magiclink.issue(email, ip, next_url)
+        else:
+            app.logger.info('sign-in link withheld for %s from %s', email, ip)
+        try:
+            magiclink.purge_expired()
+        except Exception:
+            app.logger.exception('auth token purge failed')
+        return render_template('login_sent.html', title='Check Your Email', email=email)
+
+    return render_template('login.html', title='Sign In', email='', next=next_url)
+
+
 @app.route('/login2')
 def login2():
-    return render_template('login2.html',
-                           loginurl=googlelogin.login_url(redirect_uri=url_for('create_or_update_user', _external=True),
-                                                          params={'next': url_for('index')}))
-
-@app.route('/oauth2callback')
-@googlelogin.oauth2callback
-def create_or_update_user(token, userinfo, **params):
-    user = User.query.filter_by(username=userinfo['id']).first()
-    if user:
-        user.fullname = userinfo['name']
-        user.avatar = userinfo['picture']
-    else:
-        user = User(username=userinfo['id'],
-                    fullname=userinfo['name'],
-                    avatar=userinfo['picture'])
-    db.session.add(user)
-    db.session.commit()
-    remember_me = False
-    if 'remember_me' in session:
-        remember_me = session['remember_me']
-        session.pop('remember_me', None)
-    if login_user(user, remember=remember_me):
-        flash(user.fullname + ' logged in Successfully')
-    return redirect(request.args.get('next') or url_for('index'))
+    """Old Google sign-in path -- keep it alive for stale bookmarks."""
+    return redirect(url_for('login'))
 
 
-@app.route('/logout')
+@app.route('/auth/verify')
+def verify():
+    """Redeem a magic link: sign the user in, creating the account if new."""
+    email, next_url = magiclink.consume(request.args.get('token'))
+    if email is None:
+        flash('That sign-in link has expired or was already used. Here is a fresh start.')
+        return redirect(url_for('login'))
+
+    user = User.query.filter(func.lower(User.email) == email).first()
+    if user is None:
+        user = User(email=email,
+                    fullname=email.split('@')[0],
+                    nickname=User.make_unique_nickname(email.split('@')[0]),
+                    active=True,
+                    role=ROLE_USER)
+        db.session.add(user)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # Two clicks landing together both miss the SELECT and both
+            # insert; the loser trips the unique index on email. That is
+            # a successful sign-in, not an error -- read back the winner.
+            db.session.rollback()
+            user = User.query.filter(func.lower(User.email) == email).first()
+            if user is None:
+                flash('Could not complete sign in. Please request a new link.')
+                return redirect(url_for('login'))
+
+    if not login_user(user, remember=True):
+        # Deactivated account -- the link was valid, so say so plainly
+        # rather than redirecting to a login page that will keep working
+        # and keep failing.
+        app.logger.info('sign-in refused for deactivated account %s', user.email)
+        flash('That account has been deactivated. Get in touch if that is a surprise.')
+        return redirect(url_for('index'))
+    flash('Signed in as ' + user.email)
+    return redirect(next_url or url_for('index'))
+
+
+@app.route('/logout', methods=['GET', 'POST'])
 def logout():
     logout_user()
+    flash('Signed out.')
     return redirect(url_for('index'))
 
 

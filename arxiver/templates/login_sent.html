@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block header %}
+    <h1>Check Your Email</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="well">
+                <p>If <strong>{{ email }}</strong> can sign in here, a link is on its way.
+                    Open it within 15 minutes to finish signing in.</p>
+                <p class="text-muted">Nothing arrived? Check your spam folder, then
+                    <a href="{{ url_for('login') }}">request another link</a>.</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}

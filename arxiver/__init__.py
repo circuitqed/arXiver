@@ -5,18 +5,15 @@ from flask_login import LoginManager
 from config import ARTICLES_PER_PAGE
 from flask_migrate import Migrate
 
-from .flask_googlelogin import GoogleLogin
-
 app = Flask(__name__, static_url_path='')
 app.config.from_object('config')
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 lm = LoginManager()
-lm.login_view = 'login2'
+lm.login_view = 'login'
 lm.init_app(app)
-googlelogin = GoogleLogin(app, lm)
-googlelogin.get_profile = lambda x: print("get_profile")
+lm.login_message = 'Sign in to do that.'
 
 
 def url_for_other_page(page):

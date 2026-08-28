@@ -138,7 +138,10 @@ class User(db.Model, UserMixin):
 
     @property
     def is_active(self):
-        return self.active
+        # Rows predating the magic-link switch have active IS NULL, and a
+        # None here makes Flask-Login refuse the sign-in without saying
+        # why. Only an explicit False deactivates an account.
+        return self.active is not False
 
     @property
     def is_anonymous(self):
@@ -149,6 +152,31 @@ class User(db.Model, UserMixin):
 
     def __repr__(self):
         return '<User %r>' % (self.username)
+
+
+class AuthToken(db.Model):
+    """A pending magic-link sign-in.
+
+    The raw token only ever exists in the emailed URL; we store its
+    SHA-256 hash, so a database leak doesn't hand out live links.
+    Rows are kept after use (used_at set) as a short audit trail and
+    swept by ``purge_expired``.
+    """
+    __tablename__ = 'auth_token'
+
+    token_hash = db.Column(db.String(64), primary_key=True)
+    email = db.Column(db.String(), nullable=False, index=True)
+    created = db.Column(db.DateTime(), nullable=False, default=datetime.datetime.utcnow)
+    expires = db.Column(db.DateTime(), nullable=False, index=True)
+    used_at = db.Column(db.DateTime())
+    # IP that asked for the link -- rate limiting and abuse debugging.
+    requester_ip = db.Column(db.String(64))
+    # Where to drop the user after a successful verify. Always a
+    # relative path; validated before it is stored.
+    next_url = db.Column(db.String())
+
+    def __repr__(self):
+        return '<AuthToken %r %s>' % (self.email, self.token_hash[:8])
 
 
 class Feed(db.Model):
