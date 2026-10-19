@@ -29,8 +29,8 @@ docker compose restart app
 # Database shell
 docker compose exec db psql -U arxiver arxiver
 
-# Update articles from arXiv OAI-PMH API
-docker compose exec app python -c "from arxiver.updater import do_update; do_update()"
+# Harvest articles from the arXiv OAI-PMH API (own process, see below)
+docker compose exec -d cron python /app/harvest.py
 ```
 
 ## Project Structure
@@ -44,6 +44,7 @@ arxiver/
 │   ├── forms.py             # WTForms form classes
 │   ├── apis.py              # REST API (currently disabled)
 │   ├── updater.py           # arXiv OAI-PMH paper fetcher
+│   ├── harvest_state.py     # Harvest claim/status (flock + JSON state)
 │   ├── magiclink.py         # Magic-link tokens, rate limits, sign-in email
 │   ├── mail.py              # Email delivery (console / Resend backends)
 │   ├── templates/           # Jinja2 templates
@@ -125,6 +126,46 @@ Note that rows created before this switch had `active IS NULL`, which
 Flask-Login reads as falsy and refuses to sign in without explanation.
 The column is backfilled and `User.is_active` now treats only an
 explicit `False` as deactivated.
+
+## Harvesting
+
+Harvests run in **their own process**, in the `cron` container -- same image
+and code as the app, serving no traffic:
+
+```bash
+# scheduled: daily at HARVEST_AT (default 08:15 UTC), by ops/harvest-loop.sh
+docker compose logs -f cron
+
+# manually, detached
+docker compose exec -d cron python /app/harvest.py
+docker compose exec -d cron python /app/harvest.py --all   # full archive walk
+
+# status (needs UPDATE_TOKEN)
+curl -H "X-Update-Token: $UPDATE_TOKEN" http://localhost:7854/update/status
+```
+
+This is not a stylistic choice. The harvest used to run as a thread spawned
+inside a gunicorn worker by `GET /update`. With two sync workers, a harvest
+holding the GIL made every request routed to its worker crawl: during the
+46-day catch-up in Oct 2026 the home page took 56s and `/about` -- which
+touches no database at all -- timed out entirely, so the site served white
+pages. `/update` now returns 410 and tells you to use the CLI; only
+`/update/status` still answers. Measured during a harvest after the move:
+home page 0.65-1.3s, `/about` a few milliseconds.
+
+Two harvests can't overlap: `claim_slot()` takes an flock around
+`tmp/update_state.json`. A claim records the pid **and hostname** of its
+holder, so a claim whose process died is taken over rather than blocking
+forever -- without that, a killed harvest left `running: true` and every
+later attempt was refused, which stranded the database 46 days behind while
+the scheduler collected 41 consecutive refusals. The hostname matters now
+that the claimer is in a different container from the status reader: pids are
+per-namespace, so a claim from another host falls back to a 12-hour
+wall-clock backstop instead of a meaningless `os.kill` check.
+
+Note that `Synchronization` is only written **after** a full walk completes,
+so an interrupted harvest redoes its whole range. Re-running is otherwise
+harmless -- articles upsert.
 
 ## Key Models
 

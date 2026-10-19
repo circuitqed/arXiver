@@ -6,128 +6,12 @@ __author__ = 'dave'
 # module. Anything at module scope ran before that and broke.
 import datetime
 import time
-import os
-import json
-import fcntl
-import threading
-import traceback
 import secrets
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify, abort
 from flask_login import login_user, logout_user, current_user, login_required
 from sqlalchemy.exc import IntegrityError
-from arxiver import app, db, lm, ARTICLES_PER_PAGE, magiclink
-from arxiver.updater import Updater
+from arxiver import app, db, lm, ARTICLES_PER_PAGE, magiclink, harvest_state
 
-UPDATE_STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tmp', 'update_state.json')
-UPDATE_LOCK_FILE = UPDATE_STATE_FILE + '.lock'
-_DEFAULT_STATE = {'running': False, 'started': None, 'finished': None, 'count': None,
-                  'error': None, 'pid': None}
-
-# A claim whose holder died would otherwise block every later update for
-# good: that is what stranded the feed from 2026-09-04 to 2026-10-19, when
-# a harvest was killed mid-run and the daily cron got 409 CONFLICT 41 times
-# in a row. A claim counts only while the process holding it is alive, with
-# a wall-clock backstop for a process that survives but whose harvest
-# thread doesn't. The backstop is generous because a first harvest walks
-# the whole archive and legitimately runs for hours.
-UPDATE_STALE_AFTER = datetime.timedelta(hours=12)
-
-
-def _read_update_state():
-    try:
-        with open(UPDATE_STATE_FILE, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return dict(_DEFAULT_STATE)
-
-
-def _write_update_state(state):
-    tmp = UPDATE_STATE_FILE + '.tmp'
-    with open(tmp, 'w') as f:
-        json.dump(state, f)
-    os.replace(tmp, UPDATE_STATE_FILE)
-
-
-def _holder_alive(pid):
-    """Is the process that claimed the slot still around?"""
-    if not pid:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        # Alive, just not ours to signal.
-        return True
-    return True
-
-
-def _claim_is_stale(state):
-    """True when a 'running' claim should be ignored and taken over."""
-    if not _holder_alive(state.get('pid')):
-        return True
-    started = state.get('started')
-    try:
-        age = datetime.datetime.now() - datetime.datetime.fromisoformat(started)
-    except (TypeError, ValueError):
-        # No parseable start time means we can't tell how old the claim is,
-        # so treat it as stale rather than block forever on it.
-        return True
-    return age > UPDATE_STALE_AFTER
-
-
-def _claim_update_slot():
-    """Atomically try to mark an update as running. Returns (claimed, state)."""
-    os.makedirs(os.path.dirname(UPDATE_LOCK_FILE), exist_ok=True)
-    with open(UPDATE_LOCK_FILE, 'w') as lockf:
-        fcntl.flock(lockf, fcntl.LOCK_EX)
-        state = _read_update_state()
-        if state.get('running'):
-            if not _claim_is_stale(state):
-                return False, state
-            app.logger.warning('taking over stale update claim (started=%s pid=%s)',
-                               state.get('started'), state.get('pid'))
-        state = {
-            'running': True,
-            'started': datetime.datetime.now().isoformat(),
-            'finished': None,
-            'count': None,
-            'error': None,
-            'pid': os.getpid(),
-        }
-        _write_update_state(state)
-        return True, state
-
-
-def _finish_update_slot(count=None, error=None):
-    with open(UPDATE_LOCK_FILE, 'w') as lockf:
-        fcntl.flock(lockf, fcntl.LOCK_EX)
-        state = _read_update_state()
-        if state.get('pid') not in (None, os.getpid()):
-            # Our claim was taken over as stale and someone else is running
-            # now. Clearing it here would mark their live harvest finished.
-            app.logger.warning('finished late; claim now held by pid %s, leaving it',
-                               state.get('pid'))
-            return
-        state['running'] = False
-        state['pid'] = None
-        state['finished'] = datetime.datetime.now().isoformat()
-        state['count'] = count
-        state['error'] = error
-        _write_update_state(state)
-
-
-def _run_update_async(update_all):
-    with app.app_context():
-        try:
-            count = Updater().run(update_all=update_all)
-            _finish_update_slot(count=count)
-            app.logger.info('background update finished: %d records', count)
-        except Exception:
-            tb = traceback.format_exc()
-            _finish_update_slot(error=tb)
-            app.logger.error('background update failed:\n%s', tb)
-            db.session.rollback()
 from .forms import (LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm,
                     AuthorForm, MagicLinkForm)
 from .models import *
@@ -657,14 +541,16 @@ def update(cmd=''):
     if not expected or not token or not secrets.compare_digest(token, expected):
         abort(403)
     if cmd == 'status':
-        state = _read_update_state()
-        # Say whether a 'running' claim is one the next caller would take
-        # over, so a wedged harvest is visible from the status alone.
-        state['stale'] = bool(state.get('running')) and _claim_is_stale(state)
-        return jsonify(state)
-    update_all = cmd == 'all'
-    claimed, state = _claim_update_slot()
-    if not claimed:
-        return 'update already running since %s.\n' % state.get('started', '(unknown)'), 409
-    threading.Thread(target=_run_update_async, args=(update_all,), daemon=True).start()
-    return 'update started %s. check /update/status?token=... for progress.\n' % state['started'], 202
+        # `stale` says whether a 'running' claim is one the next harvest would
+        # take over, so a wedged claim is visible without reading the file.
+        return jsonify(harvest_state.status())
+    # Triggering a harvest over HTTP is gone. It ran the harvest as a thread
+    # in a gunicorn worker, which starved request handling badly enough to
+    # serve white pages during a long catch-up. Harvests now run in their own
+    # process, on a schedule, from the cron container.
+    return ('harvests are no longer started over HTTP -- they run in their own '
+            'process.\n'
+            'scheduled:  daily at HARVEST_AT (default 08:15 UTC) in the cron container\n'
+            'manually:   docker compose run --rm --no-deps cron python harvest.py\n'
+            'full walk:  docker compose run --rm --no-deps cron python harvest.py --all\n'
+            'status:     /update/status\n'), 410

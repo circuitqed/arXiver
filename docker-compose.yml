@@ -37,18 +37,25 @@ services:
     restart: unless-stopped
 
   cron:
-    image: alpine:latest
+    # Same image and code as the app, but serves no traffic: the harvest runs
+    # here, in its own process. It used to run as a thread inside a gunicorn
+    # worker, where a long catch-up starved request handling and the site
+    # served white pages.
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: arxiver-cron
-    depends_on:
-      - app
+    volumes:
+      - .:/app
     env_file:
       - .env
-    command:
-      - sh
-      - -c
-      - |
-        echo "15 8 * * * wget -qO- --timeout=3600 --header=\"X-Update-Token: $$UPDATE_TOKEN\" http://app:5000/update" > /etc/crontabs/root
-        crond -f -l 8
+    environment:
+      # Daily harvest time, UTC.
+      - HARVEST_AT=08:15
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "/app/ops/harvest-loop.sh"]
     restart: unless-stopped
 
 volumes:
