@@ -47,7 +47,7 @@ services:
       - sh
       - -c
       - |
-        echo "15 8 * * * wget -qO- --timeout=3600 \"http://app:5000/update?token=$$UPDATE_TOKEN\"" > /etc/crontabs/root
+        echo "15 8 * * * wget -qO- --timeout=3600 --header=\"X-Update-Token: $$UPDATE_TOKEN\" http://app:5000/update" > /etc/crontabs/root
         crond -f -l 8
     restart: unless-stopped
 

@@ -12,6 +12,17 @@ class LoginForm(FlaskForm):
     remember_me = BooleanField('remember_me', default=False)
 
 
+class MagicLinkForm(FlaskForm):
+    """Carries the CSRF token for the sign-in form.
+
+    Email validity is checked in the view (magiclink.valid_email) because the
+    view has to answer identically whether or not the address can sign in --
+    so form-level validation errors would themselves leak which addresses the
+    allowlist accepts.
+    """
+    email = StringField('email')
+
+
 class EditUserForm(FlaskForm):
     nickname = StringField('nickname', validators=[DataRequired()])
     fullname = StringField('fullname')

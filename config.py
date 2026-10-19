@@ -2,7 +2,18 @@ import os
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 CSRF_ENABLED = True
-SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
+# Fail closed rather than fall back. The old default ('dev-secret-key-change-me')
+# is in the public repo, and a session cookie signed with a known key is a
+# forgeable login -- an unset env var would have silently downgraded auth to
+# nothing. Debug runs still get a throwaway key so `python run.py` works.
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if os.environ.get('FLASK_DEBUG') == '1':
+        SECRET_KEY = 'dev-only-insecure-key'
+    else:
+        raise RuntimeError(
+            'SECRET_KEY is not set. Set it in .env (openssl rand -hex 32); '
+            'refusing to start with a publicly-known default.')
 
 SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', "postgresql://arxiver:arxiver@db/arxiver")
 SQLALCHEMY_TRACK_MODIFICATIONS = False

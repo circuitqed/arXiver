@@ -36,7 +36,12 @@
                                 class="caret"></b></a>
                         <ul class="dropdown-menu">
                             <li><a href="{{ url_for('edit') }}">Preferences</a></li>
-                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                            <li>
+                                <form action="{{ url_for('logout') }}" method="post" style="margin:0;">
+                                    <button type="submit" class="btn btn-link"
+                                            style="padding:3px 20px;width:100%;text-align:left;">Logout</button>
+                                </form>
+                            </li>
                         </ul>
                     </li>
                 {% else %}

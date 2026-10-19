@@ -10,6 +10,7 @@
                 <p>Enter your email address and we'll send you a link that signs you in.
                     No password to remember.</p>
                 <form action="{{ url_for('login') }}" method="post" role="form">
+                    {{ form.csrf_token }}
                     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
                     <div class="form-group">
                         <label for="email">Email address</label>

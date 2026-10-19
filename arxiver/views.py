@@ -11,6 +11,7 @@ import json
 import fcntl
 import threading
 import traceback
+import secrets
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify, abort
 from flask_login import login_user, logout_user, current_user, login_required
 from sqlalchemy.exc import IntegrityError
@@ -127,7 +128,8 @@ def _run_update_async(update_all):
             _finish_update_slot(error=tb)
             app.logger.error('background update failed:\n%s', tb)
             db.session.rollback()
-from .forms import LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm, AuthorForm
+from .forms import (LoginForm, SearchForm, FeedForm, SimpleSearchForm, EditForm,
+                    AuthorForm, MagicLinkForm)
 from .models import *
 
 
@@ -211,15 +213,19 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
+    # FlaskForm purely for its CSRF token: without one, any page could make a
+    # visitor's browser POST here, mailing a link to an address of the
+    # attacker's choosing and burning the visitor's IP against the rate limit.
+    form = MagicLinkForm()
     next_url = magiclink.safe_next(request.args.get('next'))
 
-    if request.method == 'POST':
-        email = magiclink.normalize_email(request.form.get('email'))
+    if form.validate_on_submit():
+        email = magiclink.normalize_email(form.email.data)
         next_url = magiclink.safe_next(request.form.get('next')) or next_url
         if not magiclink.valid_email(email):
             flash("That doesn't look like an email address.")
-            return render_template('login.html', title='Sign In',
-                                   email=request.form.get('email'), next=next_url)
+            return render_template('login.html', title='Sign In', form=form,
+                                   email=form.email.data, next=next_url)
 
         ip = magiclink.client_ip(request)
         # Everything below reports the same outcome to the browser. A
@@ -236,7 +242,13 @@ def login():
             app.logger.exception('auth token purge failed')
         return render_template('login_sent.html', title='Check Your Email', email=email)
 
-    return render_template('login.html', title='Sign In', email='', next=next_url)
+    if request.method == 'POST':
+        # Only reachable on a stale or missing CSRF token -- the form has no
+        # other validators.
+        flash('That form had expired. Please try again.')
+
+    return render_template('login.html', title='Sign In', form=form,
+                           email='', next=next_url)
 
 
 @app.route('/login2')
@@ -284,7 +296,7 @@ def verify():
     return redirect(next_url or url_for('index'))
 
 
-@app.route('/logout', methods=['GET', 'POST'])
+@app.route('/logout', methods=['POST'])
 def logout():
     logout_user()
     flash('Signed out.')
@@ -301,18 +313,18 @@ def index(page=1, query=None):
         return redirect(url_for('index', query=request.form['query']))
     if query is not None:
         articles = Article.simple_search(query)
-        articles = articles.paginate(page, ARTICLES_PER_PAGE, False)
+        articles = articles.paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
 
         return render_template('index.html', user=g.user, articles=articles)
     if g.user is not None and not g.user.is_anonymous:
         subscribed = False
         for s in g.user.subscriptions:
             subscribed = True
-            articles = s.feed.feed_articles().paginate(page, ARTICLES_PER_PAGE, False)
+            articles = s.feed.feed_articles().paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
         if not subscribed:
-            articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
+            articles = Article.query.order_by(Article.created.desc()).paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
     else:
-        articles = Article.query.order_by(Article.created.desc()).paginate(page, ARTICLES_PER_PAGE, False)
+        articles = Article.query.order_by(Article.created.desc()).paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
 
     return render_template('index.html', user=g.user, articles=articles)
 
@@ -367,7 +379,7 @@ def author(id, page=1):
         flash('Author #' + str(id) + ' not found.')
         return redirect(url_for('index'))
 
-    author_articles = author.author_articles().paginate(page, ARTICLES_PER_PAGE, False)
+    author_articles = author.author_articles().paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
 
     # if g.user is not None and g.user.is_authenticated():
     #     author_form = AuthorForm(user=g.user, author=author)
@@ -415,6 +427,26 @@ def autocomplete_keyword(search_term):
     return jsonify(keywords=[{'id': k.id, 'keyword': k.keyword} for k in keywords])
 
 
+def _feed_for_write(feed_id):
+    """Return a feed the signed-in user owns, or abort.
+
+    Every feed-mutating endpoint looked its feed up by the id in the request
+    body and checked only that the caller was logged in -- so any account
+    could edit or delete any other account's feeds. Sign-up is now open to
+    anyone who can receive an email, which makes that a much shorter path
+    than it was when login required a Google account. 404 rather than 403 so
+    the reply doesn't confirm which feed ids exist.
+    """
+    try:
+        feed_id = int(feed_id)
+    except (TypeError, ValueError):
+        abort(404)
+    feed = Feed.query.filter(Feed.id == feed_id).first()
+    if feed is None or feed.owner_id != current_user.id:
+        abort(404)
+    return feed
+
+
 @app.route('/feed/<int:id>', methods=['GET', 'POST'])
 @app.route('/feed/<int:id>/page/<int:page>', methods=['GET', 'POST'])
 @app.route('/feed/new', methods=['GET', 'POST'])
@@ -437,7 +469,19 @@ def feed(id=None, page=1):
         return redirect(url_for('feed', id=f.id, edit=True))
     else:
         f = Feed.query.filter(Feed.id == id).first()
-        s = Subscription.query.filter(and_(Subscription.feed_id == id, Subscription.user_id == g.user.id)).first()
+        if f is None:
+            abort(404)
+        owns = f.owner_id == current_user.id
+        # The `public` column was written by the form and then never read, so
+        # every feed was visible to every signed-in account and -- worse --
+        # the Delete branch below would delete any of them. Reads now need
+        # ownership or a public feed; writes always need ownership.
+        if request.method == 'POST' and not owns:
+            abort(404)
+        if not owns and not f.public:
+            abort(404)
+        s = Subscription.query.filter(and_(Subscription.feed_id == id,
+                                           Subscription.user_id == current_user.id)).first()
 
     form = FeedForm(request.form, f, subscription=s)
 
@@ -455,6 +499,11 @@ def feed(id=None, page=1):
         print('validated')
 
         f = form.populate_obj(f)
+        if s is None:
+            # An owner with no subscription row (possible for feeds whose
+            # duplicate subscription was dropped during the account merge)
+            # would otherwise 500 here.
+            s = Subscription(subscriber=current_user, feed=f)
         s.enable_email = form.enable_email.data
         s.email_frequency = form.email_frequency.data
 
@@ -465,10 +514,11 @@ def feed(id=None, page=1):
         return redirect(url_for('feed', id=f.id, edit=edit))
     else:
         if f is not None:
-            articles = f.feed_articles().paginate(page, ARTICLES_PER_PAGE, False)
+            articles = f.feed_articles().paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
             if articles.total == 0: edit = True
-            form.enable_email.data = form.subscription.enable_email
-            form.email_frequency.data = form.subscription.email_frequency
+            if form.subscription is not None:
+                form.enable_email.data = form.subscription.enable_email
+                form.email_frequency.data = form.subscription.email_frequency
         else:
             articles = None
             edit = True
@@ -518,12 +568,11 @@ def add_feed_author():
 def delete_feed_author():
     # print request.values['author_id']
     # print request.values['feed_id']
-    feed = Feed.query.filter(Feed.id == int(request.json['feed_id'])).first()
-    author = Author.query.filter(Author.id == int(request.json['author_id'])).first()
+    feed = _feed_for_write(request.json.get('feed_id'))
+    author = Author.query.filter(Author.id == request.json.get('author_id')).first()
 
-    if (feed is None) or (author is None):
-        print("Error: Invalid feed/author in delete_feed_author!")
-        return "Error: Invalid feed/author in delete_feed_author!"
+    if author is None:
+        return "Error: Invalid author in delete_feed_author!", 400
 
     if author in feed.authors:
         feed.authors.remove(author)
@@ -536,12 +585,11 @@ def delete_feed_author():
 @app.route('/delete_feed_keyword', methods=['POST'])
 @login_required
 def delete_feed_keyword():
-    feed = Feed.query.filter(Feed.id == int(request.json['feed_id'])).first()
-    keyword = Keyword.query.filter(Keyword.keyword.ilike(request.json['keyword'])).first()
+    feed = _feed_for_write(request.json.get('feed_id'))
+    keyword = Keyword.query.filter(Keyword.keyword.ilike(request.json.get('keyword') or '')).first()
 
-    if (feed is None) or (keyword is None):
-        print("Error: Invalid feed/keyword in delete_feed_keyword!")
-        return "Error: Invalid feed/keyword in delete_feed_keyword!"
+    if keyword is None:
+        return "Error: Invalid keyword in delete_feed_keyword!", 400
 
     if keyword in feed.keywords:
         feed.keywords.remove(keyword)
@@ -554,17 +602,16 @@ def delete_feed_keyword():
 @app.route('/add_feed_keyword', methods=['POST'])
 @login_required
 def add_feed_keyword():
-    feed = Feed.query.filter(Feed.id == int(request.json['feed_id'])).first()
-    keyword = Keyword.query.filter(Keyword.keyword.ilike(request.json['keyword'])).first()
+    feed = _feed_for_write(request.json.get('feed_id'))
+    raw = (request.json.get('keyword') or '').strip()
+    if not raw:
+        return "Error: Missing keyword in add_feed_keyword!", 400
+    keyword = Keyword.query.filter(Keyword.keyword.ilike(raw)).first()
 
     if keyword is None:
-        keyword = Keyword(keyword=request.json['keyword'])
+        keyword = Keyword(keyword=raw)
         db.session.add(keyword)
         db.session.commit()
-
-    if (feed is None):
-        print("Error: Invalid feed in delete_feed_keyword!")
-        return "Error: Invalid feed in delete_feed_keyword!"
 
     if keyword not in feed.keywords:
         feed.keywords.append(keyword)
@@ -601,8 +648,13 @@ def about():
 @app.route('/update')
 @app.route('/update/<string:cmd>')
 def update(cmd=''):
-    token = request.args.get('token', '')
-    if not token or token != app.config.get('UPDATE_TOKEN', ''):
+    # Header first so the token can stay out of request URLs, which get
+    # logged by every proxy in front of this app; the query parameter stays
+    # supported for existing callers. compare_digest rather than != so the
+    # check doesn't leak the token's prefix through timing.
+    expected = app.config.get('UPDATE_TOKEN', '')
+    token = request.headers.get('X-Update-Token') or request.args.get('token', '')
+    if not expected or not token or not secrets.compare_digest(token, expected):
         abort(403)
     if cmd == 'status':
         state = _read_update_state()

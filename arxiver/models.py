@@ -7,7 +7,7 @@ from sqlalchemy import or_, and_, func
 import sqlalchemy
 
 # fulltext imports from http://sqlalchemy-searchable.readthedocs.org/en/latest/
-from flask_sqlalchemy import BaseQuery
+from flask_sqlalchemy.query import Query as BaseQuery
 from sqlalchemy_searchable import search, make_searchable
 from sqlalchemy_utils.types import TSVectorType
 from sqlalchemy.sql import select
@@ -17,23 +17,53 @@ from sqlalchemy.types import Interval
 
 def parse_search_query(query):
     """Convert a human search query to PostgreSQL tsquery format.
-    Compatibility shim for older sqlalchemy_searchable API.
-    Adjacent terms get implicit & between them.
-    'or' maps to |, 'and' maps to &."""
-    tokens = query.split()
+
+    Compatibility shim for the older sqlalchemy_searchable API. Adjacent
+    terms get an implicit &; 'or' maps to |, 'and' maps to &.
+
+    The result is passed to to_tsquery() as a bound parameter, so this is not
+    an injection boundary -- but it IS a syntax boundary. to_tsquery() raises
+    on a malformed query, and a raised error here is a 500 on a public page:
+    searching for the single word "or" used to emit the bare query "|" and
+    blow up. So every term is reduced to characters tsquery accepts and the
+    operator structure is normalised -- no leading, trailing or doubled
+    operators -- returning '' (which to_tsquery accepts, matching nothing)
+    rather than a fragment.
+    """
     result = []
-    for token in tokens:
+    for token in query.split():
         lower = token.lower()
-        if lower == 'or':
-            result.append('|')
-        elif lower == 'and':
-            result.append('&')
-        elif lower not in ('', '(', ')'):
-            # Insert implicit & between consecutive terms
+        if lower in ('or', '|'):
+            op = '|'
+        elif lower in ('and', '&'):
+            op = '&'
+        else:
+            op = None
+
+        if op is not None:
+            # Drop an operator with nothing to its left and collapse runs of
+            # them, so "or qubit" and "a or and b" stay parseable.
             if result and result[-1] not in ('|', '&'):
-                result.append('&')
-            result.append(token.replace("'", "''") + ':*')
-    return ' '.join(result) if result else ''
+                result.append(op)
+            continue
+
+        # Keep only what tsquery treats as part of a lexeme. Quotes, colons,
+        # parens, backslashes and '*' are syntax to its parser, so stripping
+        # them is what keeps a query like it's or (foo) from erroring. The
+        # old code doubled single quotes, which was both unnecessary (bound
+        # parameter) and the cause of a second syntax error: a term of only
+        # quotes became "''" and then "'':*".
+        term = ''.join(ch for ch in token if ch.isalnum() or ch in '-_')
+        if not term:
+            continue
+        if result and result[-1] not in ('|', '&'):
+            result.append('&')
+        result.append(term + ':*')
+
+    # A trailing operator is a syntax error on its own.
+    while result and result[-1] in ('|', '&'):
+        result.pop()
+    return ' '.join(result)
 from sqlalchemy.orm import deferred
 from flask_login import UserMixin
 # from social.apps.flask_app import models
