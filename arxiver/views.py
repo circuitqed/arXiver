@@ -212,6 +212,14 @@ def _estimated_article_count():
     return None
 
 
+def _paginate_feed(feed, page):
+    """Paginate a feed's articles, counting the cheap way."""
+    pagination = feed.feed_articles().paginate(page=page, per_page=ARTICLES_PER_PAGE,
+                                               error_out=False, count=False)
+    pagination.total = feed.feed_article_count()
+    return pagination
+
+
 def _paginate_recent(query, page):
     """Paginate the unfiltered reverse-chronological listing without counting."""
     pagination = query.paginate(page=page, per_page=ARTICLES_PER_PAGE,
@@ -242,8 +250,7 @@ def index(page=1, query=None):
         # but the last. Pick the subscription first, then query once.
         subs = list(g.user.subscriptions)
         if subs:
-            articles = subs[-1].feed.feed_articles().paginate(
-                page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
+            articles = _paginate_feed(subs[-1].feed, page)
         if not subs:
             articles = _paginate_recent(Article.query.order_by(Article.created.desc()), page)
     else:
@@ -437,7 +444,7 @@ def feed(id=None, page=1):
         return redirect(url_for('feed', id=f.id, edit=edit))
     else:
         if f is not None:
-            articles = f.feed_articles().paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
+            articles = _paginate_feed(f, page)
             if articles.total == 0: edit = True
             if form.subscription is not None:
                 form.enable_email.data = form.subscription.enable_email

@@ -234,13 +234,35 @@ class Feed(db.Model):
         #explain (analyze,buffers) select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         #select article.*, (article.id+0) as dummy_article_id from article where search_vector @@ to_tsquery('circuit:* & qed:* | qubit:*') union select a.*, (a.id+0) as dummy_article_id from article a join articlesauthors aa on a.id=aa.article_id where author_id in (54962, 55738, 85464, 85465, 125598, 55921) order by created desc;search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         #search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
+        q = Article.query.filter(Article.id.in_(self.article_id_union(distinct=False)))
+        return q.order_by((Article.created + cast("0",
+                                                  Interval)).desc())  # Deliberately non-indexable sort key -- see the note in simple_search for why, and what the measurements are.
+
+    def article_id_union(self, distinct=True):
+        """Article ids matching this feed: its authors' papers, plus keyword hits.
+
+        `distinct` picks UNION over UNION ALL. For feed_articles it can be
+        False -- the enclosing IN (...) dedupes anyway, and skipping the
+        HashAggregate is worth about 20% of the query. Anything that counts
+        these rows needs True, because an article matching both an author and
+        a keyword appears twice otherwise (18,521 vs 15,257 on feed 3).
+        """
         search_query = parse_search_query(' or '.join([kw.keyword for kw in self.keywords]))
         alist = [a.id for a in self.authors]
         s1 = select([ArticleAuthor.article_id]).where(ArticleAuthor.author_id.in_(alist))
         s2 = select([Article.id]).where(Article.search_vector.op('@@')(func.to_tsquery(search_query)))
-        q = Article.query.filter(Article.id.in_(s1.union(s2))).order_by((Article.created + cast("0",
-                                                                                                Interval)).desc())  # Deliberately non-indexable sort key -- see the note in simple_search for why, and what the measurements are.
-        return q
+        return s1.union(s2) if distinct else s1.union_all(s2)
+
+    def feed_article_count(self):
+        """How many articles this feed matches.
+
+        Counted straight off the union rather than by wrapping
+        feed_articles(). Letting paginate() count meant re-scanning `article`
+        for rows the union had already identified, and its subquery selected
+        every column including search_vector: 480ms, against 156ms for this.
+        """
+        return db.session.execute(
+            select([func.count()]).select_from(self.article_id_union().alias())).scalar()
 
 
 class Subscription(db.Model):
