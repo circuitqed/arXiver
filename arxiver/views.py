@@ -7,6 +7,9 @@ __author__ = 'dave'
 import datetime
 import time
 import secrets
+
+# How stale User.last_seen may get before we spend a write refreshing it.
+LAST_SEEN_INTERVAL = datetime.timedelta(minutes=5)
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify, abort
 from flask_login import login_user, logout_user, current_user, login_required
 from sqlalchemy.exc import IntegrityError
@@ -42,9 +45,13 @@ def before_request():
 #    with open('/home/dave/arXiver/tmp/test.txt','a') as f:
 #        f.write(dir(g.user))
     if g.user.is_authenticated:
-        g.user.last_seen = datetime.datetime.utcnow()
-        db.session.add(g.user)
-        db.session.commit()
+        # This used to write and commit on every authenticated request, making
+        # every page view a write transaction (and WAL traffic) to refresh a
+        # timestamp nobody reads at second precision.
+        now = datetime.datetime.utcnow()
+        if g.user.last_seen is None or now - g.user.last_seen > LAST_SEEN_INTERVAL:
+            g.user.last_seen = now
+            db.session.add(g.user)
 
 
 @app.after_request
@@ -201,11 +208,15 @@ def index(page=1, query=None):
 
         return render_template('index.html', user=g.user, articles=articles)
     if g.user is not None and not g.user.is_anonymous:
-        subscribed = False
-        for s in g.user.subscriptions:
-            subscribed = True
-            articles = s.feed.feed_articles().paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
-        if not subscribed:
+        # Only the last subscription's articles were ever rendered, but the
+        # loop ran feed_articles() -- the expensive union-of-keywords-and-
+        # authors query -- once per subscription and discarded every result
+        # but the last. Pick the subscription first, then query once.
+        subs = list(g.user.subscriptions)
+        if subs:
+            articles = subs[-1].feed.feed_articles().paginate(
+                page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
+        if not subs:
             articles = Article.query.order_by(Article.created.desc()).paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
     else:
         articles = Article.query.order_by(Article.created.desc()).paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)

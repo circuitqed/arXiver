@@ -262,7 +262,8 @@ class Author(db.Model):
     forenames = db.Column(db.String(), index=True)
     lastname = db.Column(db.String(), index=True)
 
-    associations = db.relationship('ArticleAuthor', backref='author')
+    associations = db.relationship('ArticleAuthor',
+                                   backref=db.backref('author', lazy='joined'))
     articles = association_proxy('associations', 'article')
 
     def collaborators(self):
@@ -338,9 +339,13 @@ class Article(db.Model):
     search_vector = deferred(db.Column(TSVectorType('full_description')))
 
     #These set up the ordered list of authors
+    # selectin: one extra query fetches the associations for every article in
+    # the page at once, instead of one per article. Every template that lists
+    # articles walks article.authors, so this belongs on the relationship
+    # rather than on each query that happens to remember to ask for it.
     associations = db.relationship('ArticleAuthor', order_by="ArticleAuthor.position",
                                    collection_class=ordering_list('position'),
-                                   backref='article'
+                                   backref='article', lazy='selectin'
     )
 
     authors = association_proxy('associations', 'author')
