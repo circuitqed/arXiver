@@ -1,6 +1,10 @@
 __author__ = 'dave'
 
-from datetime import datetime
+# Module, not the class: every use in this file is datetime.datetime.*, and
+# the old `from datetime import datetime` only worked because the star
+# import of .models further down happened to rebind the name to the
+# module. Anything at module scope ran before that and broke.
+import datetime
 import time
 import os
 import json
@@ -15,7 +19,17 @@ from arxiver.updater import Updater
 
 UPDATE_STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tmp', 'update_state.json')
 UPDATE_LOCK_FILE = UPDATE_STATE_FILE + '.lock'
-_DEFAULT_STATE = {'running': False, 'started': None, 'finished': None, 'count': None, 'error': None}
+_DEFAULT_STATE = {'running': False, 'started': None, 'finished': None, 'count': None,
+                  'error': None, 'pid': None}
+
+# A claim whose holder died would otherwise block every later update for
+# good: that is what stranded the feed from 2026-09-04 to 2026-10-19, when
+# a harvest was killed mid-run and the daily cron got 409 CONFLICT 41 times
+# in a row. A claim counts only while the process holding it is alive, with
+# a wall-clock backstop for a process that survives but whose harvest
+# thread doesn't. The backstop is generous because a first harvest walks
+# the whole archive and legitimately runs for hours.
+UPDATE_STALE_AFTER = datetime.timedelta(hours=12)
 
 
 def _read_update_state():
@@ -33,6 +47,34 @@ def _write_update_state(state):
     os.replace(tmp, UPDATE_STATE_FILE)
 
 
+def _holder_alive(pid):
+    """Is the process that claimed the slot still around?"""
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Alive, just not ours to signal.
+        return True
+    return True
+
+
+def _claim_is_stale(state):
+    """True when a 'running' claim should be ignored and taken over."""
+    if not _holder_alive(state.get('pid')):
+        return True
+    started = state.get('started')
+    try:
+        age = datetime.datetime.now() - datetime.datetime.fromisoformat(started)
+    except (TypeError, ValueError):
+        # No parseable start time means we can't tell how old the claim is,
+        # so treat it as stale rather than block forever on it.
+        return True
+    return age > UPDATE_STALE_AFTER
+
+
 def _claim_update_slot():
     """Atomically try to mark an update as running. Returns (claimed, state)."""
     os.makedirs(os.path.dirname(UPDATE_LOCK_FILE), exist_ok=True)
@@ -40,13 +82,17 @@ def _claim_update_slot():
         fcntl.flock(lockf, fcntl.LOCK_EX)
         state = _read_update_state()
         if state.get('running'):
-            return False, state
+            if not _claim_is_stale(state):
+                return False, state
+            app.logger.warning('taking over stale update claim (started=%s pid=%s)',
+                               state.get('started'), state.get('pid'))
         state = {
             'running': True,
             'started': datetime.datetime.now().isoformat(),
             'finished': None,
             'count': None,
             'error': None,
+            'pid': os.getpid(),
         }
         _write_update_state(state)
         return True, state
@@ -56,7 +102,14 @@ def _finish_update_slot(count=None, error=None):
     with open(UPDATE_LOCK_FILE, 'w') as lockf:
         fcntl.flock(lockf, fcntl.LOCK_EX)
         state = _read_update_state()
+        if state.get('pid') not in (None, os.getpid()):
+            # Our claim was taken over as stale and someone else is running
+            # now. Clearing it here would mark their live harvest finished.
+            app.logger.warning('finished late; claim now held by pid %s, leaving it',
+                               state.get('pid'))
+            return
         state['running'] = False
+        state['pid'] = None
         state['finished'] = datetime.datetime.now().isoformat()
         state['count'] = count
         state['error'] = error
@@ -552,7 +605,11 @@ def update(cmd=''):
     if not token or token != app.config.get('UPDATE_TOKEN', ''):
         abort(403)
     if cmd == 'status':
-        return jsonify(_read_update_state())
+        state = _read_update_state()
+        # Say whether a 'running' claim is one the next caller would take
+        # over, so a wedged harvest is visible from the status alone.
+        state['stale'] = bool(state.get('running')) and _claim_is_stale(state)
+        return jsonify(state)
     update_all = cmd == 'all'
     claimed, state = _claim_update_slot()
     if not claimed:
