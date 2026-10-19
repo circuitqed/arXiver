@@ -239,7 +239,7 @@ class Feed(db.Model):
         s1 = select([ArticleAuthor.article_id]).where(ArticleAuthor.author_id.in_(alist))
         s2 = select([Article.id]).where(Article.search_vector.op('@@')(func.to_tsquery(search_query)))
         q = Article.query.filter(Article.id.in_(s1.union(s2))).order_by((Article.created + cast("0",
-                                                                                                Interval)).desc())  #The addition of the extra interval is important because it changes the way the query plan is computed and makes it run 100x faster!
+                                                                                                Interval)).desc())  # Deliberately non-indexable sort key -- see the note in simple_search for why, and what the measurements are.
         return q
 
 
@@ -320,18 +320,24 @@ class Article(db.Model):
     query_class = ArticleQuery
 
     id = db.Column(db.Integer, primary_key=True)
+    # index=True was on nearly every column here as a just-in-case. Postgres
+    # has never used any of them: pg_stat_user_indexes showed 0 scans for
+    # title, comments, doi, journalref, mscclass, acmclass and license across
+    # billions of pkey lookups, while they cost 1069 MB of disk and a write on
+    # every harvested row. Indexes kept below are the ones with measured
+    # scans: arxiv_id (the harvest's lookup), created and updated (ordering).
     arxiv_id = db.Column(db.String(64), index=True, unique=True)
-    title = db.Column(db.String(), index=True)
+    title = db.Column(db.String())
     abstract = db.Column(db.String())
     full_description = db.Column(db.String())
-    comments = db.Column(db.String(), index=True)
+    comments = db.Column(db.String())
     created = db.Column(db.Date(), index=True)
     updated = db.Column(db.Date(), index=True)
-    doi = db.Column(db.String(), index=True)
-    journalref = db.Column(db.String(), index=True)
-    mscclass = db.Column(db.String(), index=True)
-    acmclass = db.Column(db.String(), index=True)
-    license = db.Column(db.String(), index=True)
+    doi = db.Column(db.String())
+    journalref = db.Column(db.String())
+    mscclass = db.Column(db.String())
+    acmclass = db.Column(db.String())
+    license = db.Column(db.String())
 
     title_search_vector = deferred(db.Column(TSVectorType('title')))
     abstract_search_vector = deferred(db.Column(TSVectorType('abstract')))
@@ -364,8 +370,26 @@ class Article(db.Model):
 
         #q = q1.union(q2)
 
+        # Do not "clean up" the + interval '0'. It makes the sort key a
+        # non-indexable expression on purpose, which forces the planner to
+        # resolve the full-text filter through the GIN index and then top-N
+        # sort the matches. The commented-out plain ORDER BY below reads
+        # better and is a trap: it lets the planner walk ix_article_created
+        # backwards hoping to hit 10 matches early. Measured on 3.1M rows:
+        #
+        #   term            plain ORDER BY     with + interval '0'
+        #   qubit:*                   8 ms                  333 ms
+        #   fluxonium:*           10,221 ms                    7 ms
+        #   (no matches)       did not finish                  7 ms
+        #
+        # Postgres cannot estimate prefix-match (:*) selectivity well, so for
+        # anything rare it picks the date walk and scans most of the table.
+        # The hack trades a bounded ~300 ms for an unbounded worst case, which
+        # is the right trade for user-facing search. The real fix is an index
+        # that can filter and order at once -- a RUM index supports exactly
+        # this (full-text match ordered by timestamp) and would beat both.
         return q1.order_by((Article.created + cast("0", Interval)).desc())
-        #return q1.order_by(Article.created.desc())
+        #return q1.order_by(Article.created.desc())  # see above -- do not use
 
 
     def __repr__(self):

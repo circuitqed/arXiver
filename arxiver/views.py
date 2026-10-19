@@ -12,6 +12,7 @@ import secrets
 LAST_SEEN_INTERVAL = datetime.timedelta(minutes=5)
 from flask import render_template, redirect, flash, session, url_for, request, g, jsonify, abort
 from flask_login import login_user, logout_user, current_user, login_required
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from arxiver import app, db, lm, ARTICLES_PER_PAGE, magiclink, harvest_state
 
@@ -194,6 +195,33 @@ def logout():
     return redirect(url_for('index'))
 
 
+def _estimated_article_count():
+    """The planner's row estimate for `article`: instant, vs ~1.2s to count.
+
+    Counting 3.1M rows exactly is a full index-only scan, and the homepage was
+    paying it on every request to render a last-page number. The true count
+    only moves when the harvest runs -- once a day -- and ANALYZE keeps
+    reltuples within about a percent, which is far more precision than a
+    page-number strip needs. Filtered listings (search, feeds) still count
+    exactly; those are selective and cheap.
+    """
+    row = db.session.execute(
+        text("select reltuples::bigint from pg_class where relname = 'article'")).first()
+    if row and row[0] and row[0] > 0:
+        return int(row[0])
+    return None
+
+
+def _paginate_recent(query, page):
+    """Paginate the unfiltered reverse-chronological listing without counting."""
+    pagination = query.paginate(page=page, per_page=ARTICLES_PER_PAGE,
+                                error_out=False, count=False)
+    total = _estimated_article_count()
+    if total is not None:
+        pagination.total = total
+    return pagination
+
+
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/page/<int:page>', methods=['GET', 'POST'])
 @app.route('/search/<string:query>', methods=['GET', 'POST'])
@@ -217,9 +245,9 @@ def index(page=1, query=None):
             articles = subs[-1].feed.feed_articles().paginate(
                 page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
         if not subs:
-            articles = Article.query.order_by(Article.created.desc()).paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
+            articles = _paginate_recent(Article.query.order_by(Article.created.desc()), page)
     else:
-        articles = Article.query.order_by(Article.created.desc()).paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
+        articles = _paginate_recent(Article.query.order_by(Article.created.desc()), page)
 
     return render_template('index.html', user=g.user, articles=articles)
 
