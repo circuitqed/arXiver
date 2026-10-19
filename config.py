@@ -18,6 +18,12 @@ if not SECRET_KEY:
 SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', "postgresql://arxiver:arxiver@db/arxiver")
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+# Check a pooled connection is still alive before handing it to a request.
+# Without this, anything that drops the server's connections -- a Postgres
+# restart, a network blip -- leaves dead connections in the pool and the next
+# requests fail until it cycles. Costs one trivial round-trip per checkout.
+SQLALCHEMY_ENGINE_OPTIONS = {'pool_pre_ping': True}
+
 ARTICLES_PER_PAGE = 10
 
 # administrator list

@@ -187,7 +187,7 @@ Two things that will mislead you while debugging a harvest:
 
 ## Key Models
 
-- **Article**: arXiv papers with title, abstract, full-text search vectors
+- **Article**: arXiv papers with title, abstract, and one full-text search vector
 - **Author**: Paper authors with collaboration tracking
 - **Feed**: User-created feeds combining keywords and authors
 - **Subscription**: User subscriptions to feeds
@@ -195,7 +195,46 @@ Two things that will mislead you while debugging a harvest:
 
 ## Database
 
-PostgreSQL with full-text search (tsvector). The database contains ~8,300 articles, ~5,600 authors, and ~44,000 article-author associations. Search vectors are maintained by database triggers.
+PostgreSQL with full-text search (tsvector). ~3.18M articles, ~2.1M authors
+and ~13.7M article-author associations; ~26 GB. `search_vector` (over
+`full_description`) is the only tsvector column, maintained by the
+`article_search_vector_trigger`.
+
+### Performance notes
+
+Everything below was measured, not guessed; `pg_stat_user_indexes` and a
+SQLAlchemy `after_cursor_execute` hook are the two tools that found all of it.
+
+- **Don't add an index without checking it gets scanned.** 5.8 GB of the
+  original 7.3 GB of indexes on `article` had never been scanned once, across
+  2.9 billion pkey lookups: seven from `index=True` sprinkled across the
+  model, six on tsvector columns nothing queried, and one exact duplicate of
+  another. Unused indexes are a write on every harvested row.
+- **Article lists eager-load authors.** `article.authors` is an
+  `association_proxy`, so lazily loading it cost 44 extra queries on a
+  10-article page. `lazy='selectin'` on `Article.associations` plus a joined
+  `author` backref makes it 3 queries total. The strategy lives on the
+  relationship because every listing template walks that proxy.
+- **The homepage does not count rows.** An exact `count(*)` over 3.18M rows is
+  a ~1.2s index-only scan, and it was running on every request to render a
+  last-page number for a total that changes once a day. `_paginate_recent()`
+  takes `reltuples` from `pg_class` instead. Filtered listings still count
+  exactly -- they're selective and cheap.
+- **Settings live in `ops/tune-postgres.sql`.** Postgres was on stock defaults;
+  `random_page_cost` was 4, a spinning-disk value that costs index scans ~4x
+  too high on this SSD-backed host.
+- **`pool_pre_ping` is on.** Without it a Postgres restart leaves dead
+  connections in the pool and the next requests 500.
+
+Current timings (quiet database): `/about` 4ms, `/` 15ms, `/page/2` 11ms,
+`/article/<id>` 12ms, rare-term search 27ms, common-term search ~450ms. That
+last one is the deliberate tradeoff described in `simple_search` -- a RUM
+index is what would fix it.
+
+Dropping a column marks it dropped but does not return its bytes; the ~5.75 GB
+the three removed tsvector columns occupy in already-written rows needs a table
+rewrite, and with the host at 84% disk there isn't room for `VACUUM FULL` on a
+26 GB database. New rows are smaller and three fewer triggers fire per insert.
 
 Connection: `postgresql://arxiver:arxiver@db/arxiver` (within Docker network)
 

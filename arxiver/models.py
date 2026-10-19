@@ -339,9 +339,10 @@ class Article(db.Model):
     acmclass = db.Column(db.String())
     license = db.Column(db.String())
 
-    title_search_vector = deferred(db.Column(TSVectorType('title')))
-    abstract_search_vector = deferred(db.Column(TSVectorType('abstract')))
-    title_abstract_search_vector = deferred(db.Column(TSVectorType('title', 'abstract')))
+    # Only this one is ever queried. There were three more -- over title,
+    # abstract, and title+abstract -- left from comparing full-text
+    # approaches; they were never referenced again, but each carried a GIN
+    # index and a trigger recomputing to_tsvector on every harvested row.
     search_vector = deferred(db.Column(TSVectorType('full_description')))
 
     #These set up the ordered list of authors
