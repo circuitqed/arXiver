@@ -167,6 +167,24 @@ Note that `Synchronization` is only written **after** a full walk completes,
 so an interrupted harvest redoes its whole range. Re-running is otherwise
 harmless -- articles upsert.
 
+Two things that will mislead you while debugging a harvest:
+
+- **The image has no `ps`** (`python:3.11-slim` ships without procps), so
+  `ps ax | grep harvest` reports nothing whether or not the harvest is
+  running. Check `/proc/<pid>/cmdline` instead.
+- **A slow harvest looks like a dead one.** arXiv throttles OAI-PMH with
+  `Retry-After`, so minutes can pass with the article count unchanged. Watch
+  `last_seen`-style progress over several minutes before concluding anything.
+- `/update/status` read from the **app** container can only report
+  `stale: false` for a claim held by the **cron** container until the 12-hour
+  backstop, because it can't check another namespace's pid. A new harvest
+  still takes the claim over correctly, since that runs in the same container
+  as the holder -- so this is a display wart, not an outage. If it ever needs
+  to be exact, a Postgres advisory lock (released automatically when the
+  holding connection dies, and visible from any container) is the right fix,
+  not a heartbeat -- a heartbeat would false-positive during throttling and
+  start a second harvest.
+
 ## Key Models
 
 - **Article**: arXiv papers with title, abstract, full-text search vectors
