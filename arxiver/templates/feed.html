@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% block header %}
-    <button id="editFeedBtn" class="slideDownCtl btn btn-primary btn-lg" data-target="#edit_feed" style="float:right">
-        Edit
-    </button>
+    {% if edit %}
+        <a href="{{ url_for('feed', id=feed.id) }}" class="btn btn-default btn-lg"
+           style="float:right">Done</a>
+    {% else %}
+        <a href="{{ url_for('feed', id=feed.id, edit=True) }}" class="btn btn-primary btn-lg"
+           style="float:right">Edit</a>
+    {% endif %}
     <h2>{{ feed.name }}</h2>
 {% endblock %}
 
@@ -10,6 +14,13 @@
     {% include "subscriptions.html" %}
 {% endblock %}
 {% block content %}
+    {# The whole editor used to be rendered on every view and merely hidden
+       with display:none, so viewing a feed shipped a row per author whether
+       or not you were editing. On a 309-author feed that was 83 KB of the
+       page's 122 KB -- invisible markup, and the dominant cost on a slow
+       connection. Edit is a link now rather than a JS reveal of markup we
+       already paid to send. #}
+    {% if edit %}
     <div id="edit_feed"
             {% if edit %}
          style=""
@@ -57,6 +68,7 @@
         {% endfor %}
         <hr>
     </div>
+    {% endif %}
 
     <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
         <div class="modal-dialog">
