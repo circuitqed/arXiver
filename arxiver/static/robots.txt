@@ -1,0 +1,21 @@
+# Served at /robots.txt because the app uses static_url_path=''.
+#
+# /author/ and /search/ are the expensive routes: an author page unions and
+# counts that author's whole publication history, and AI crawlers walking
+# author ids sequentially (and paginating each one) were saturating both
+# gunicorn workers. /article/ pages are the content worth indexing and cost
+# about 5 ms, so those stay open.
+User-agent: *
+Crawl-delay: 10
+Disallow: /author/
+Disallow: /search/
+Disallow: /feed/
+Disallow: /add_feed_author
+Disallow: /autocomplete/
+Disallow: /login
+Disallow: /login2
+Disallow: /auth/
+Disallow: /logout
+Disallow: /edit
+Disallow: /update
+Allow: /article/

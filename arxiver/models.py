@@ -15,6 +15,17 @@ from sqlalchemy.sql.expression import cast
 from sqlalchemy.types import Interval
 
 
+def like_escape(value):
+    """Escape LIKE/ILIKE metacharacters in a value used as a literal.
+
+    These names come from arXiv metadata and from URLs, and ILIKE treats
+    backslash as an escape character -- so an author genuinely named "Bele\\"
+    made similar_authors() raise InvalidEscapeSequence and return a 500. The
+    same applies to % and _, which would silently turn a name into a wildcard.
+    """
+    return (value or '').replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+
 def parse_search_query(query):
     """Convert a human search query to PostgreSQL tsquery format.
 
@@ -296,8 +307,11 @@ class Author(db.Model):
         return q
 
     def similar_authors(self):
-        return Author.query.filter(Author.lastname.ilike(self.lastname),
-                                   Author.forenames.ilike(self.forenames[0] + '%'), Author.id != self.id)
+        conditions = [Author.lastname.ilike(like_escape(self.lastname)),
+                      Author.id != self.id]
+        if self.forenames:
+            conditions.append(Author.forenames.ilike(like_escape(self.forenames[0]) + '%'))
+        return Author.query.filter(*conditions)
 
     @staticmethod
     def author_id_articles(id):
@@ -306,13 +320,25 @@ class Author(db.Model):
     def author_articles(self):
         return Author.author_id_articles(self.id)
 
+    def article_count(self):
+        """How many articles this author has.
+
+        An index lookup on articlesauthors, rather than letting paginate()
+        count a subquery over `article` -- same number, far less work, and
+        /author/ is both the most crawled route here and the one where a
+        prolific author made the count expensive.
+        """
+        return db.session.execute(
+            select([func.count()]).select_from(ArticleAuthor.__table__)
+            .where(ArticleAuthor.author_id == self.id)).scalar()
+
     @staticmethod
     def auto_complete_authors(search_term):
         names = search_term.split(' ')
         conditions = []
-        conditions.append(Author.lastname.ilike(names[-1] + '%'))
-        if len(names) > 1:
-            conditions.append(Author.forenames.ilike(search_term[0] + '%'))
+        conditions.append(Author.lastname.ilike(like_escape(names[-1]) + '%'))
+        if len(names) > 1 and search_term:
+            conditions.append(Author.forenames.ilike(like_escape(search_term[0]) + '%'))
         similar_authors = Author.query.filter(and_(*conditions)).with_entities(Author.id, Author.forenames,
                                                                                Author.lastname)
         return similar_authors

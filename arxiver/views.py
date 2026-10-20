@@ -309,7 +309,9 @@ def author(id, page=1):
         flash('Author #' + str(id) + ' not found.')
         return redirect(url_for('index'))
 
-    author_articles = author.author_articles().paginate(page=page, per_page=ARTICLES_PER_PAGE, error_out=False)
+    author_articles = author.author_articles().paginate(
+        page=page, per_page=ARTICLES_PER_PAGE, error_out=False, count=False)
+    author_articles.total = author.article_count()
 
     # if g.user is not None and g.user.is_authenticated():
     #     author_form = AuthorForm(user=g.user, author=author)
