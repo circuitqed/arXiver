@@ -66,6 +66,56 @@ def block_abusive_crawlers():
     return None
 
 
+AUTHOR_GUARD_COOKIE = 'ax_v'
+
+
+@app.before_request
+def guard_author_pages():
+    """Make unreferred, cookieless access to /author/ cost a round trip.
+
+    /author/ is disallowed in robots.txt and is where essentially all the
+    crawl load lands -- in one 60-second sample every single request to it
+    arrived with no Referer, so nothing legitimate was click-through traffic.
+    Blocking by user agent cannot help here: the remaining load is ~600
+    requests a minute from ~600 distinct addresses, one request each, behind
+    ordinary-looking browser user agents.
+
+    So instead of identifying the client, ask it to do something a browser
+    does for free and a stateless scraper does not: keep a cookie across one
+    redirect. A visitor following a link from this site sends a same-origin
+    Referer and never sees it; one arriving from outside pays a single
+    redirect. Deliberately not a 403 -- external links to author pages should
+    still work.
+
+    Checks cookies rather than current_user because touching current_user
+    would load the session from the database, which is the cost being avoided.
+    """
+    if not app.config.get('AUTHOR_PAGE_GUARD'):
+        return None
+    if not request.path.startswith('/author/'):
+        return None
+    if request.cookies.get(AUTHOR_GUARD_COOKIE):
+        return None
+    # Cheap signed-in check: the real authentication still runs downstream.
+    if 'session' in request.cookies or 'remember_token' in request.cookies:
+        return None
+    referer = request.headers.get('Referer') or ''
+    if referer.startswith(request.host_url):
+        return None
+    if request.args.get('ck'):
+        # Came back from the redirect still holding no cookie.
+        return ('Automated access to author pages is blocked. These pages are '
+                'disallowed in /robots.txt.\n'), 403
+    target = request.path + ('&' if request.query_string else '?') + 'ck=1'
+    if request.query_string:
+        target = request.path + '?' + request.query_string.decode() + '&ck=1'
+    response = redirect(target)
+    response.set_cookie(AUTHOR_GUARD_COOKIE, '1', max_age=86400,
+                        httponly=True, samesite='Lax',
+                        secure=app.config.get('SESSION_COOKIE_SECURE', True))
+    return response
+
+
 @app.before_request
 def before_request():
     g.user = current_user

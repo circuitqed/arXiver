@@ -51,6 +51,13 @@ EMAIL_FROM = os.environ.get('EMAIL_FROM', 'arXiver <arxiver@send.lazybrains.com>
 # off on their own once robots.txt existed.
 BLOCKED_USER_AGENTS = os.environ.get('BLOCKED_USER_AGENTS', 'ShapBot,ExaSearchBot')
 
+# Author pages are disallowed in robots.txt and, measured over a 60-second
+# window, 100% of requests to them arrived with no Referer at all -- not one
+# same-origin click-through. The guard below asks an unreferred, unsigned-in
+# visitor's browser to hold a cookie for one round trip; browsers do this
+# transparently, stateless scrapers do not. Set to 0 to turn it off.
+AUTHOR_PAGE_GUARD = os.environ.get('AUTHOR_PAGE_GUARD', '1') == '1'
+
 # Optional gate on who may sign in. Comma-separated; entries are either a
 # full address (dave@example.com) or a bare domain (stanford.edu) which
 # matches anything at it. Empty means anyone with a working mailbox --

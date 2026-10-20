@@ -25,5 +25,5 @@ CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120",
      # %(h)s is always the cloudflared container behind the tunnel, so log
      # Cloudflare's client IP header too -- without it there is no way to
      # tell whether abusive traffic is a few hosts or a rotating pool.
-     "--access-logformat", "%(h)s cf=%({cf-connecting-ip}i)s \"%(r)s\" %(s)s %(b)s %(D)sus \"%(a)s\"", \
+     "--access-logformat", "%(h)s cf=%({cf-connecting-ip}i)s \"%(r)s\" %(s)s %(b)s %(D)sus ref=%({referer}i)s \"%(a)s\"", \
      "arxiver:app"]

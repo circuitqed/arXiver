@@ -98,7 +98,10 @@
     <script src="{{ url_for("static", filename="js/typeahead.bundle.js") }}"></script>
     <script src="{{ url_for("static", filename="js/arxiver.js") }}"></script>
     <script type="text/javascript"
-            src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+            src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+        {# cdn.mathjax.org was retired in 2017 and this was loaded over plain
+           http on an https page, so browsers blocked it as mixed active
+           content and no maths has rendered here for years. #}
 
 </body>
 </html>
