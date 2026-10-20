@@ -39,6 +39,33 @@ def load_user(id):
     return u
 
 
+_blocked_ua_patterns = None
+
+
+@app.before_request
+def block_abusive_crawlers():
+    """Refuse crawlers that ignore robots.txt, before touching the database.
+
+    Registered ahead of before_request so a blocked request costs a dictionary
+    lookup rather than a session load, a feed query and a render. Cloudflare
+    would be the better place for this -- it would save the bandwidth too --
+    but these crawlers are unverified and so absent from its managed bot
+    list, and blocking them there needs a custom WAF rule.
+    """
+    global _blocked_ua_patterns
+    if _blocked_ua_patterns is None:
+        raw = app.config.get('BLOCKED_USER_AGENTS') or ''
+        _blocked_ua_patterns = [p.strip().lower() for p in raw.split(',') if p.strip()]
+    if not _blocked_ua_patterns:
+        return None
+    ua = (request.headers.get('User-Agent') or '').lower()
+    for pattern in _blocked_ua_patterns:
+        if pattern in ua:
+            return ('This crawler is blocked because it does not fetch /robots.txt.\n'
+                    'Contact the site owner if you believe this is in error.\n'), 403
+    return None
+
+
 @app.before_request
 def before_request():
     g.user = current_user
@@ -57,7 +84,11 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    diff = int((time.time() - g.start_time) * 1000)  # to get a time in ms
+    # g.start_time is missing whenever an earlier before_request short-circuits
+    # the request -- the crawler block does exactly that -- and reading it
+    # unguarded turned every 403 into a 500.
+    start = getattr(g, 'start_time', None)
+    diff = int((time.time() - start) * 1000) if start else 0
 
     if (response.response and response.content_type.startswith("text/html") and response.status_code == 200):
         response.response[0] = response.response[0].replace(b'__EXECUTION_TIME__', str(diff).encode())

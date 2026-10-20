@@ -43,6 +43,14 @@ EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'console')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 EMAIL_FROM = os.environ.get('EMAIL_FROM', 'arXiver <arxiver@send.lazybrains.com>')
 
+# Crawlers refused outright, as case-insensitive substrings of the User-Agent.
+# These two never fetch /robots.txt -- verified in the access log -- while
+# between them accounting for most of the traffic and server time on this
+# site, all of it walking /author/. Crawlers that do read robots.txt
+# (Claude-SearchBot, Reflectionbot) are deliberately not listed: they backed
+# off on their own once robots.txt existed.
+BLOCKED_USER_AGENTS = os.environ.get('BLOCKED_USER_AGENTS', 'ShapBot,ExaSearchBot')
+
 # Optional gate on who may sign in. Comma-separated; entries are either a
 # full address (dave@example.com) or a bare domain (stanford.edu) which
 # matches anything at it. Empty means anyone with a working mailbox --
